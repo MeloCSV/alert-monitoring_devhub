@@ -10,6 +10,14 @@ logger = logging.getLogger(__name__)
 ENV_VAR_ELASTIC_GCP = "KIBANA_ELASTIC_GCP"
 ENV_VAR_ELASTIC = "KIBANA_ELASTIC"
 
+_PROD_ENVS = {"pre", "pro"}
+
+
+def _warn_insecure_ssl(name: str, verify_ssl: bool) -> None:
+    env = os.environ.get("ENVIRONMENT", "").lower()
+    if not verify_ssl and env in _PROD_ENVS:
+        logger.warning("verify_ssl=False en entorno %s para Kibana '%s'; riesgo de seguridad.", env, name)
+
 
 def _load_from_env(env_var: str) -> List[KibanaConfig]:
     raw = os.environ.get(env_var)
@@ -30,7 +38,7 @@ def _load_from_env(env_var: str) -> List[KibanaConfig]:
     configs: List[KibanaConfig] = []
     for item in items:
         try:
-            configs.append(KibanaConfig(
+            cfg = KibanaConfig(
                 name=item["name"],
                 base_url=item["base_url"],
                 api_key=item["api_key"],
@@ -38,7 +46,9 @@ def _load_from_env(env_var: str) -> List[KibanaConfig]:
                 verify_ssl=item.get("verify_ssl", True),
                 per_page=item.get("per_page", 100),
                 max_pages=item.get("max_pages", 100),
-            ))
+            )
+            _warn_insecure_ssl(cfg.name, cfg.verify_ssl)
+            configs.append(cfg)
         except KeyError as exc:
             logger.error("Kibana mal configurado, falta el campo %s: %s", exc, item.get("name", "?"))
     return configs

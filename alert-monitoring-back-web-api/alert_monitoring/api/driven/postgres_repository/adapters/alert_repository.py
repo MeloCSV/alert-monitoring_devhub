@@ -47,6 +47,9 @@ class AlertRepositoryAdapter(AlertRepositoryPort):
             if filters.solution:
                 query = query.filter(AlertDB.solution == filters.solution)
 
+        if filters is not None and filters.limit is not None and not filters.environments:
+            query = query.offset(filters.offset or 0).limit(filters.limit)
+
         alerts_db = query.all()
 
         if filters is not None and filters.environments:
@@ -55,5 +58,8 @@ class AlertRepositoryAdapter(AlertRepositoryPort):
                 a for a in alerts_db
                 if a.environments and wanted.intersection(a.environments)
             ]
+            if filters.limit is not None:
+                start = filters.offset or 0
+                alerts_db = alerts_db[start: start + filters.limit]
 
         return self.alert_db_mapper.to_domain_list(alerts_db)

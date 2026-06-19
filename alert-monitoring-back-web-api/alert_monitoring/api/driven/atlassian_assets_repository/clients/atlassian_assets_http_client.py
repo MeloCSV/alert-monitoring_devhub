@@ -48,7 +48,7 @@ class AtlassianAssetsHttpClient:
                         label=f"AtlassianAssets startAt={start_at}",
                     )
                 except httpx.HTTPError as exc:
-                    logger.error("Error al consultar Atlassian Assets (startAt=%s): %s", start_at, exc)
+                    logger.error("Error al consultar Atlassian Assets (url=%s, startAt=%s): %s", url, start_at, exc)
                     break
 
                 payload = response.json()

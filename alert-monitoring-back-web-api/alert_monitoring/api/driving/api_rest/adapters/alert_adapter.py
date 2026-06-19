@@ -59,6 +59,8 @@ def get_all_alerts(
     environments: Optional[List[str]] = Query(None, description="Entornos: dev, itg, pre, pro"),
     microservice: Optional[str] = Query(None, description="Filtra por microservicio (coincidencia parcial)"),
     solution: Optional[str] = Query(None, description="Filtra por solución (coincidencia exacta)"),
+    limit: int = Query(100, ge=1, le=1000, description="Número máximo de alertas a devolver"),
+    offset: int = Query(0, ge=0, description="Número de alertas a omitir"),
     alert_service: AlertServicePort = Depends(Injector.instance(AlertServicePort)),
     api_rest_mapper: AlertDTOMapper = Depends(Injector.instance(AlertDTOMapper)),
     logger: Logger = Depends(Injector.instance(LoggerSetup, "LoggerSetup.get_logger")),
@@ -71,6 +73,8 @@ def get_all_alerts(
         environments=environments,
         microservice=microservice,
         solution=solution,
+        limit=limit,
+        offset=offset,
     )
     alerts = alert_service.get_all_alerts(filters)
     return ok_json(api_rest_mapper.to_models_decorator(alerts))

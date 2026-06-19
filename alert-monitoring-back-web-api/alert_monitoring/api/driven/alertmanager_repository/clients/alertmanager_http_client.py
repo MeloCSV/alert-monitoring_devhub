@@ -29,7 +29,7 @@ class AlertManagerHttpClient:
                     label=f"AlertManager {config.name}",
                 )
         except httpx.HTTPError as exc:
-            logger.error("Error al consultar silencios en AlertManager %s: %s", config.name, exc)
+            logger.error("Error al consultar silencios en AlertManager %s (url=%s): %s", config.name, url, exc)
             return []
 
         payload = response.json()
