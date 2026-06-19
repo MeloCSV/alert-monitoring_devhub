@@ -10,7 +10,7 @@ networks:
 
 services:
   db_postgres_alert_monitoring:
-    image: postgres:11
+    image: postgres:16
     environment:
       POSTGRES_USER: sa
       POSTGRES_PASSWORD: root
