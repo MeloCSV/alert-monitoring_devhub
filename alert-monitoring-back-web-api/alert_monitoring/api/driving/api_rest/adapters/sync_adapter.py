@@ -1,11 +1,10 @@
 import os
+import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, Future, TimeoutError as FuturesTimeoutError
 from logging import Logger
-from typing import Any, Dict
-
-_TASK_TIMEOUT_SECS = int(os.getenv("SYNC_TASK_TIMEOUT", "120"))
+from typing import Any, Dict, Optional
 
 from fastapi import Depends
 from fwkpy_lib_fastapi.public.observability import TracingRouter
@@ -41,7 +40,11 @@ _sync_errors = _meter.create_counter(
     unit="{error}",
 )
 
-_ERROR_500 = {500: {'model': str}}
+_TASK_TIMEOUT_SECS = int(os.getenv("SYNC_TASK_TIMEOUT", "120"))
+
+# In-memory job store: job_id → job dict
+_jobs: Dict[str, Dict[str, Any]] = {}
+_jobs_lock = threading.Lock()
 
 
 def _run(fn) -> Dict[str, Any]:
@@ -59,39 +62,41 @@ def _run_isolated(fn) -> Dict[str, Any]:
         clean_session_context(token=token)
 
 
-@router.post('/sync/global', tags=['sync'], status_code=200, responses=_ERROR_500)
-def sync_global(
-    catalog_service: CatalogServicePort = Depends(Injector.instance(CatalogServicePort)),
-    catalog_app_api_service: CatalogAppApiServicePort = Depends(Injector.instance(CatalogAppApiServicePort)),
-    alert_service: AlertServicePort = Depends(Injector.instance(AlertServicePort)),
-    alert_api_service: AlertApiServicePort = Depends(Injector.instance(AlertApiServicePort)),
-    logger: Logger = Depends(Injector.instance(LoggerSetup, "LoggerSetup.get_logger")),
-) -> JSONResponse:
-    logger.info("sync_global started")
+def _execute_sync(
+    job_id: str,
+    catalog_service: CatalogServicePort,
+    catalog_app_api_service: CatalogAppApiServicePort,
+    alert_service: AlertServicePort,
+    alert_api_service: AlertApiServicePort,
+    logger: Logger,
+) -> None:
+    """Run the full sync in a background thread, updating the job store when done."""
     start = time.monotonic()
     results: Dict[str, Any] = {}
-
     _sync_calls.add(1, {"operation": "global"})
 
-    catalog_result = _run(catalog_service.sync_catalog)
-    results["catalog"] = catalog_result
-    if "error" in catalog_result:
-        logger.error(f"sync_global aborted: catalog failed — {catalog_result['error']}")
-        duration_ms = int((time.monotonic() - start) * 1000)
-        results["duration_ms"] = duration_ms
-        _sync_errors.add(1, {"operation": "catalog"})
-        _sync_duration.record(duration_ms, {"operation": "global", "status": "error"})
-        return JSONResponse(status_code=500, content=results)
+    # Catalog syncs need their own DB session since they run outside the request context.
+    token = set_db_session_context(session_id=str(uuid.uuid4()))
+    try:
+        catalog_result = _run(catalog_service.sync_catalog)
+        results["catalog"] = catalog_result
+        if "error" in catalog_result:
+            logger.warning(
+                "sync_global job=%s: catalog falló, continuando con datos existentes en BD — %s",
+                job_id, catalog_result["error"],
+            )
+            _sync_errors.add(1, {"operation": "catalog"})
 
-    catalog_api_result = _run(catalog_app_api_service.sync_catalog_app_api)
-    results["catalog_api"] = catalog_api_result
-    if "error" in catalog_api_result:
-        logger.error(f"sync_global aborted: catalog_api failed — {catalog_api_result['error']}")
-        duration_ms = int((time.monotonic() - start) * 1000)
-        results["duration_ms"] = duration_ms
-        _sync_errors.add(1, {"operation": "catalog_api"})
-        _sync_duration.record(duration_ms, {"operation": "global", "status": "error"})
-        return JSONResponse(status_code=500, content=results)
+        catalog_api_result = _run(catalog_app_api_service.sync_catalog_app_api)
+        results["catalog_api"] = catalog_api_result
+        if "error" in catalog_api_result:
+            logger.warning(
+                "sync_global job=%s: catalog_api falló, continuando con datos existentes en BD — %s",
+                job_id, catalog_api_result["error"],
+            )
+            _sync_errors.add(1, {"operation": "catalog_api"})
+    finally:
+        clean_session_context(token=token)
 
     executor = ThreadPoolExecutor(max_workers=3)
     try:
@@ -105,7 +110,7 @@ def sync_global(
                 results[name] = future.result(timeout=_TASK_TIMEOUT_SECS)
             except FuturesTimeoutError:
                 results[name] = {"error": f"Timeout tras {_TASK_TIMEOUT_SECS}s"}
-                logger.error("sync_global: tarea '%s' superó timeout de %ds", name, _TASK_TIMEOUT_SECS)
+                logger.error("sync_global job=%s: tarea '%s' superó timeout de %ds", job_id, name, _TASK_TIMEOUT_SECS)
                 _sync_errors.add(1, {"operation": name})
     finally:
         executor.shutdown(wait=False, cancel_futures=True)
@@ -116,6 +121,44 @@ def sync_global(
 
     duration_ms = int((time.monotonic() - start) * 1000)
     results["duration_ms"] = duration_ms
-    _sync_duration.record(duration_ms, {"operation": "global", "status": "success"})
-    logger.info(f"sync_global finished in {duration_ms}ms")
-    return JSONResponse(status_code=200, content=results)
+    _sync_duration.record(duration_ms, {"operation": "global", "status": "done"})
+    logger.info("sync_global job=%s finished in %dms", job_id, duration_ms)
+
+    with _jobs_lock:
+        _jobs[job_id].update({"status": "done", "finished_at": time.time(), "results": results})
+
+
+@router.post('/sync/global', tags=['sync'], status_code=202)
+def sync_global(
+    catalog_service: CatalogServicePort = Depends(Injector.instance(CatalogServicePort)),
+    catalog_app_api_service: CatalogAppApiServicePort = Depends(Injector.instance(CatalogAppApiServicePort)),
+    alert_service: AlertServicePort = Depends(Injector.instance(AlertServicePort)),
+    alert_api_service: AlertApiServicePort = Depends(Injector.instance(AlertApiServicePort)),
+    logger: Logger = Depends(Injector.instance(LoggerSetup, "LoggerSetup.get_logger")),
+) -> JSONResponse:
+    job_id = str(uuid.uuid4())
+    with _jobs_lock:
+        _jobs[job_id] = {"job_id": job_id, "status": "running", "started_at": time.time(), "results": None}
+
+    thread = threading.Thread(
+        target=_execute_sync,
+        args=(job_id, catalog_service, catalog_app_api_service, alert_service, alert_api_service, logger),
+        daemon=True,
+        name=f"sync-{job_id[:8]}",
+    )
+    thread.start()
+    logger.info("sync_global job=%s started", job_id)
+    return JSONResponse(status_code=202, content={"job_id": job_id, "status": "running"})
+
+
+@router.get('/sync/status/{job_id}', tags=['sync'])
+def get_sync_status(
+    job_id: str,
+    logger: Logger = Depends(Injector.instance(LoggerSetup, "LoggerSetup.get_logger")),
+) -> JSONResponse:
+    with _jobs_lock:
+        job: Optional[Dict[str, Any]] = _jobs.get(job_id)
+    if job is None:
+        return JSONResponse(status_code=404, content={"detail": f"Job '{job_id}' no encontrado"})
+    logger.info("get_sync_status job=%s status=%s", job_id, job["status"])
+    return JSONResponse(status_code=200, content=job)
