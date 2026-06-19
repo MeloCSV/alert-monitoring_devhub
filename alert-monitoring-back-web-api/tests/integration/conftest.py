@@ -11,6 +11,7 @@ from alert_monitoring.api.driven.postgres_repository.models.catalog_app_model im
 from alert_monitoring.api.driven.postgres_repository.models.catalog_app_api_model import CatalogAppApiDB  # noqa: F401
 from alert_monitoring.api.driven.postgres_repository.models.alert_api_model import AlertApiDB  # noqa: F401
 from alert_monitoring.api.driven.postgres_repository.models.default_alert_api_model import DefaultAlertApiDB  # noqa: F401
+from alert_monitoring.api.driven.postgres_repository.models.blackout_model import BlackoutDB  # noqa: F401
 
 
 @pytest.fixture(scope="session")

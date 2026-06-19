@@ -24,6 +24,7 @@ from alert_monitoring.api.driven.postgres_repository.adapters.catalog_app_reposi
 from alert_monitoring.api.driven.postgres_repository.adapters.catalog_app_api_repository import CatalogAppApiRepositoryAdapter  # noqa
 from alert_monitoring.api.driven.postgres_repository.adapters.default_alert_repository import DefaultAlertRepositoryAdapter  # noqa
 from alert_monitoring.api.driven.postgres_repository.adapters.default_alert_api_repository import DefaultAlertApiRepositoryAdapter  # noqa
+from alert_monitoring.api.driven.postgres_repository.adapters.blackout_repository import BlackoutRepositoryAdapter  # noqa
 from fwkpy_lib_fastapi import FastAPIBuilder
 
 
