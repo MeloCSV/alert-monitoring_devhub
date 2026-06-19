@@ -88,40 +88,6 @@ class TestElasticMapperMapRule:
         assert len(alert.environments) == 4
 
 
-class TestElasticMapperInferMicroservice:
-    def test_returns_application_label(self, mapper):
-        rule = _make_rule(labels={'application': 'my-app'})
-        assert mapper._infer_microservice(rule) == 'my-app'
-
-    def test_returns_deployment_label_when_no_application(self, mapper):
-        rule = _make_rule(labels={'deployment': 'my-app-back'})
-        assert mapper._infer_microservice(rule) == 'my-app-back'
-
-    def test_returns_service_label(self, mapper):
-        rule = _make_rule(labels={'service': 'my-service'})
-        assert mapper._infer_microservice(rule) == 'my-service'
-
-    def test_returns_namespace_label(self, mapper):
-        rule = _make_rule(labels={'namespace': 'my-namespace'})
-        assert mapper._infer_microservice(rule) == 'my-namespace'
-
-    def test_returns_pod_label(self, mapper):
-        rule = _make_rule(labels={'pod': 'my-pod'})
-        assert mapper._infer_microservice(rule) == 'my-pod'
-
-    def test_returns_job_label(self, mapper):
-        rule = _make_rule(labels={'job': 'my-job'})
-        assert mapper._infer_microservice(rule) == 'my-job'
-
-    def test_returns_none_when_no_known_label(self, mapper):
-        rule = _make_rule(labels={'custom': 'value'})
-        assert mapper._infer_microservice(rule) is None
-
-    def test_prefers_application_over_deployment(self, mapper):
-        rule = _make_rule(labels={'application': 'app', 'deployment': 'deploy'})
-        assert mapper._infer_microservice(rule) == 'app'
-
-
 class TestElasticMapperInferChannel:
     def test_returns_none_when_no_canals_and_no_labels(self, mapper):
         rule = _make_rule(canals=[], labels={})

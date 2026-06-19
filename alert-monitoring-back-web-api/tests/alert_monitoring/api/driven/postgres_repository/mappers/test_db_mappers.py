@@ -34,7 +34,7 @@ class TestAlertDBMapper:
 
     def test_to_db_maps_all_fields(self, mapper):
         alert = Alert(name='A', description='D', source_tool='Prometheus', severity='warning',
-                      environments=['pro'], microservice='svc', solution='app',
+                      environments=['pro'], solution='app',
                       notification_channel='Teams', chips=['svc-back'])
         db = mapper.to_db(alert)
         assert db.name == 'A'
@@ -45,7 +45,7 @@ class TestAlertDBMapper:
 
     def test_to_domain_maps_all_fields(self, mapper):
         db = AlertDB(name='A', description='D', source_tool='Prometheus', severity='warning',
-                     environments=['pro'], microservice='svc', solution='app',
+                     environments=['pro'], solution='app',
                      notification_channel='Teams', chips=['svc-back'])
         alert = mapper.to_domain(db)
         assert alert.name == 'A'

@@ -25,7 +25,6 @@ class ElasticMapper:
             source_tool="Elastic",
             severity=labels.get("severity") or "unknown",
             environments=environments_or_all(rule.environments),
-            microservice=self._infer_microservice(rule),
             solution=labels.get("application"),
             notification_channel=self._infer_channel(rule),
         )
@@ -53,10 +52,3 @@ class ElasticMapper:
 
         return " / ".join(destinations) if destinations else None
 
-    def _infer_microservice(self, rule: ElasticRule) -> Optional[str]:
-        labels = rule.labels
-        for key in ("application", "deployment", "service", "namespace", "pod", "job"):
-            value = labels.get(key)
-            if value:
-                return value
-        return None
