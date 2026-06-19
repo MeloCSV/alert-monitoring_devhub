@@ -32,7 +32,7 @@ class KibanaHttpClient:
                         label=f"Kibana {config.name} page={page}",
                     )
                 except httpx.HTTPError as exc:
-                    logger.error("Error al consultar reglas en Kibana %s (page=%s): %s", config.name, page, exc)
+                    logger.error("Error al consultar reglas en Kibana %s (url=%s, page=%s): %s", config.name, url, page, exc)
                     return rules
 
                 payload = response.json()

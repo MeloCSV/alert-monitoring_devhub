@@ -1,5 +1,32 @@
 import re
-from typing import Dict, List, Optional
+import threading
+import time
+from typing import Any, Callable, Dict, List, Optional, TypeVar
+
+_T = TypeVar("_T")
+_CACHE_TTL_SECS = 300  # 5 minutes
+
+
+class _TTLCache:
+    """Thread-safe single-value cache with a fixed TTL."""
+
+    def __init__(self, ttl: float = _CACHE_TTL_SECS) -> None:
+        self._ttl = ttl
+        self._value: Any = None
+        self._expires_at: float = 0.0
+        self._lock = threading.Lock()
+
+    def get_or_compute(self, fn: Callable[[], _T]) -> _T:
+        with self._lock:
+            if time.monotonic() < self._expires_at:
+                return self._value
+            self._value = fn()
+            self._expires_at = time.monotonic() + self._ttl
+            return self._value
+
+    def invalidate(self) -> None:
+        with self._lock:
+            self._expires_at = 0.0
 
 from fwkpy_lib_core.common.injector import inject
 from fwkpy_lib_utils.common.observability.logger.logger_setup import LoggerSetup
@@ -12,6 +39,7 @@ from alert_monitoring.api.application.ports.driven.default_alert_api_repository_
 from alert_monitoring.api.application.ports.driven.default_alert_repository_port import DefaultAlertRepositoryPort
 from alert_monitoring.api.application.ports.driven.alert_api_repository_port import AlertApiRepositoryPort
 from alert_monitoring.api.application.ports.driven.blackout_repository_port import BlackoutRepositoryPort
+from alert_monitoring.api.application.exceptions.solution_not_found import SolutionNotFoundException
 from alert_monitoring.api.application.use_cases.get_all_alerts_use_case import GetAllAlertsUseCase
 from alert_monitoring.api.application.use_cases.get_api_solution_view_use_case import GetApiSolutionViewUseCase
 from alert_monitoring.api.application.use_cases.get_solution_view_use_case import GetSolutionViewUseCase
@@ -68,6 +96,8 @@ class AlertService(AlertServicePort):
         self.kibana_adapter = KibanaAdapter()
         self.alertmanager_adapter = AlertManagerAdapter()
         self.logger = logger
+        self._catalog_lookup_cache: _TTLCache = _TTLCache()
+        self._default_alerts_cache: _TTLCache = _TTLCache()
 
     def _build_catalog_lookup(self) -> Dict[str, str]:
         return build_catalog_lookup(self.catalog_app_repository)
@@ -125,12 +155,13 @@ class AlertService(AlertServicePort):
         rules = self.prometheus_adapter.fetch_rules()
         default_raw_rules = [r for r in rules if is_default_rule(r)]
         adhoc_alerts = [a for a in self.prometheus_mapper.to_domain(rules) if a.alert_type != "Por Defecto"]
-        catalog_lookup = self._build_catalog_lookup()
+        catalog_lookup = self._catalog_lookup_cache.get_or_compute(self._build_catalog_lookup)
         self._normalize_solutions(adhoc_alerts, catalog_lookup)
 
         self.alert_repository.delete_by_source_tool("Prometheus")
         self.save_use_case.execute(adhoc_alerts)
         self._upsert_default_alerts(default_raw_rules)
+        self._default_alerts_cache.invalidate()
         return len(rules)
 
     def sync_elastic_alerts(self) -> int:
@@ -138,7 +169,7 @@ class AlertService(AlertServicePort):
         raw_rules = self.kibana_adapter.fetch_rules()
         rules = self.elastic_adapter.parse_rules(raw_rules)
         alerts = self.elastic_mapper.to_domain(rules)
-        catalog_lookup = self._build_catalog_lookup()
+        catalog_lookup = self._catalog_lookup_cache.get_or_compute(self._build_catalog_lookup)
         self._normalize_solutions(alerts, catalog_lookup)
         self.alert_repository.delete_by_source_tool("Elastic")
         self.save_use_case.execute(alerts)
@@ -186,12 +217,18 @@ class AlertService(AlertServicePort):
 
     def get_default_alerts(self) -> List[DefaultAlert]:
         self.logger.info('get_default_alerts')
-        return self.default_alert_repository.get_all()
+        return self._default_alerts_cache.get_or_compute(self.default_alert_repository.get_all)
 
     def get_solution_view(self, solution: str) -> SolutionView:
         self.logger.info(f'get_solution_view solution={solution}')
+        catalog_lookup = self._catalog_lookup_cache.get_or_compute(self._build_catalog_lookup)
+        if solution.lower() not in catalog_lookup:
+            raise SolutionNotFoundException(solution)
         return self.get_solution_view_use_case.execute(solution)
 
     def get_api_solution_view(self, app: str) -> ApiSolutionView:
         self.logger.info(f'get_api_solution_view app={app}')
+        catalog_lookup = self._catalog_lookup_cache.get_or_compute(self._build_catalog_lookup)
+        if app.lower() not in catalog_lookup:
+            raise SolutionNotFoundException(app)
         return self.get_api_solution_view_use_case.execute(app)

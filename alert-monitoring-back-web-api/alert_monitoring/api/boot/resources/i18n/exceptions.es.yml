@@ -1,2 +1,3 @@
 ---
 es:
+  solution_not_found: No existe ninguna solución con el nombre [%{solution}]
