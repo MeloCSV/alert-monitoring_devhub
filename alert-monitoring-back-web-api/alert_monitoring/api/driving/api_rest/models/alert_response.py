@@ -8,7 +8,6 @@ class AlertResponse(BaseModel):
     source_tool: str
     severity: str
     environments: List[str]
-    microservice: Optional[str] = None
     solution: Optional[str] = None
     notification_channel: Optional[str] = None
     chips: List[str] = []

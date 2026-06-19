@@ -54,7 +54,6 @@ class TestAlertRepositoryIntegration:
             severity="critical",
             chips=["ns-prod", "ns-dev"],
             environments=["pro", "pre"],
-            microservice="api-gateway",
             solution="my-platform",
             notification_channel="servicenow",
         )
@@ -68,7 +67,6 @@ class TestAlertRepositoryIntegration:
         assert saved.source_tool == "Elastic"
         assert saved.chips == ["ns-prod", "ns-dev"]
         assert saved.environments == ["pro", "pre"]
-        assert saved.microservice == "api-gateway"
         assert saved.solution == "my-platform"
         assert saved.notification_channel == "servicenow"
 
@@ -159,14 +157,3 @@ class TestAlertRepositoryIntegration:
 
         assert len(results) == 3
 
-    def test_filter_by_microservice_partial_match(self, repo):
-        """El filtro por microservice usa ilike y es parcial."""
-        repo.save_all([
-            _make_alert(name="a1", microservice="order-service"),
-            _make_alert(name="a2", microservice="payment-service"),
-        ])
-
-        results = repo.get_all(AlertFilter(microservice="order"))
-
-        assert len(results) == 1
-        assert results[0].name == "a1"

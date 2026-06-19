@@ -37,7 +37,6 @@ class PrometheusMapper:
             severity=labels.get("severity", "unknown"),
             chips=extract_adhoc_chips(rule.expr) if not is_default else [],
             environments=["pro"] if is_default else environments_or_all(self._infer_environments(rule)),
-            microservice=self._infer_microservice(rule),
             solution=self._infer_solution(rule),
             notification_channel=self._infer_channel(labels),
             alert_type=alert_type,
@@ -61,22 +60,6 @@ class PrometheusMapper:
         for label, display in BOOL_CHANNEL_LABELS:
             if labels.get(label) == "true":
                 return display
-        return None
-
-    def _infer_microservice(self, rule: PrometheusRule) -> Optional[str]:
-        labels = rule.labels
-        for key in ("service", "namespace", "job"):
-            if labels.get(key):
-                return labels[key]
-
-        if rule.expr:
-            for key in ("job", "namespace", "project_id"):
-                match = re.search(rf'{key}=(?:~)?["\']([^"\']+)["\']', rule.expr)
-                if match:
-                    return self._clean(match.group(1))
-
-        if rule.group_name:
-            return rule.group_name.replace(".rules", "")
         return None
 
     def _infer_environments(self, rule: PrometheusRule) -> List[str]:

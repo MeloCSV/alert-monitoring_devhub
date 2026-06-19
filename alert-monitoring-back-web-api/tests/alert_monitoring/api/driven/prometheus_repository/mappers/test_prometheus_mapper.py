@@ -196,32 +196,6 @@ class TestInferChannel:
 
 
 # ---------------------------------------------------------------------------
-# _infer_microservice
-# ---------------------------------------------------------------------------
-
-class TestInferMicroservice:
-    def test_uses_service_label(self, mapper):
-        rule = _rule(labels={'service': 'my-service'})
-        result = mapper.to_domain([rule])
-        assert result[0].microservice == 'my-service'
-
-    def test_uses_namespace_label_when_no_service(self, mapper):
-        rule = _rule(labels={'namespace': 'my-ns'})
-        result = mapper.to_domain([rule])
-        assert result[0].microservice == 'my-ns'
-
-    def test_extracts_namespace_from_expr(self, mapper):
-        rule = _rule(expr='rate(http_requests{namespace="my-app"}[5m])')
-        result = mapper.to_domain([rule])
-        assert result[0].microservice == 'my-app'
-
-    def test_falls_back_to_group_name(self, mapper):
-        rule = PrometheusRule(alert='X', expr='', labels={}, annotations={}, group_name='my-svc.rules', cluster_name='')
-        result = mapper.to_domain([rule])
-        assert result[0].microservice == 'my-svc'
-
-
-# ---------------------------------------------------------------------------
 # _infer_environments
 # ---------------------------------------------------------------------------
 

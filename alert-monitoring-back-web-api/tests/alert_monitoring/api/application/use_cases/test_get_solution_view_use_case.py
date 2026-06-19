@@ -26,7 +26,6 @@ def _make_alert(**kwargs) -> Alert:
         severity='warning',
         environments=['pro'],
         solution='my-app',
-        microservice='my-app-back',
     )
     defaults.update(kwargs)
     return Alert(**defaults)

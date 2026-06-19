@@ -14,7 +14,6 @@ class AlertDBMapper:
             severity=alert.severity,
             chips=alert.chips,
             environments=alert.environments,
-            microservice=alert.microservice,
             solution=alert.solution,
             notification_channel=alert.notification_channel,
         )
@@ -27,7 +26,6 @@ class AlertDBMapper:
             severity=alert_db.severity,
             chips=alert_db.chips or [],
             environments=alert_db.environments or [],
-            microservice=alert_db.microservice,
             solution=alert_db.solution,
             notification_channel=alert_db.notification_channel,
         )
