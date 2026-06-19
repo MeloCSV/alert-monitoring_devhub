@@ -1,3 +1,4 @@
+import uuid
 from typing import List, Optional
 
 from sqlalchemy import JSON
@@ -8,7 +9,7 @@ class AlertApiDB(SQLModel, table=True):
     __tablename__ = "alert_api"
     __table_args__ = {"extend_existing": True}
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     rule_id: str = Field(index=True)
     name: str
     severity: Optional[str] = None

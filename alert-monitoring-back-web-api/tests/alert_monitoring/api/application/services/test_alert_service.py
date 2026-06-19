@@ -8,6 +8,7 @@ from alert_monitoring.api.application.ports.driven.catalog_app_repository_port i
 from alert_monitoring.api.application.ports.driven.catalog_app_api_repository_port import CatalogAppApiRepositoryPort
 from alert_monitoring.api.application.ports.driven.default_alert_repository_port import DefaultAlertRepositoryPort
 from alert_monitoring.api.application.ports.driven.default_alert_api_repository_port import DefaultAlertApiRepositoryPort
+from alert_monitoring.api.application.ports.driven.blackout_repository_port import BlackoutRepositoryPort
 from alert_monitoring.api.domain.models.alert import Alert
 from alert_monitoring.api.domain.models.alert_filter import AlertFilter
 from alert_monitoring.api.domain.models.api_solution_view import ApiSolutionView
@@ -47,6 +48,7 @@ def service(mocker):
         catalog_app_api_repository=mocker.MagicMock(spec=CatalogAppApiRepositoryPort),
         default_alert_repository=mocker.MagicMock(spec=DefaultAlertRepositoryPort),
         default_alert_api_repository=mocker.MagicMock(spec=DefaultAlertApiRepositoryPort),
+        blackout_repository=mocker.MagicMock(spec=BlackoutRepositoryPort),
         logger=mocker.MagicMock(),
     )
 

@@ -11,6 +11,7 @@ from alert_monitoring.api.application.ports.driven.catalog_app_repository_port i
 from alert_monitoring.api.application.ports.driven.default_alert_api_repository_port import DefaultAlertApiRepositoryPort
 from alert_monitoring.api.application.ports.driven.default_alert_repository_port import DefaultAlertRepositoryPort
 from alert_monitoring.api.application.ports.driven.alert_api_repository_port import AlertApiRepositoryPort
+from alert_monitoring.api.application.ports.driven.blackout_repository_port import BlackoutRepositoryPort
 from alert_monitoring.api.application.use_cases.get_all_alerts_use_case import GetAllAlertsUseCase
 from alert_monitoring.api.application.use_cases.get_api_solution_view_use_case import GetApiSolutionViewUseCase
 from alert_monitoring.api.application.use_cases.get_solution_view_use_case import GetSolutionViewUseCase
@@ -42,6 +43,7 @@ class AlertService(AlertServicePort):
         catalog_app_api_repository: CatalogAppApiRepositoryPort,
         default_alert_repository: DefaultAlertRepositoryPort,
         default_alert_api_repository: DefaultAlertApiRepositoryPort,
+        blackout_repository: BlackoutRepositoryPort,
         logger: LoggerSetup,
     ):
         self.alert_repository = alert_repository
@@ -50,6 +52,7 @@ class AlertService(AlertServicePort):
         self.catalog_app_api_repository = catalog_app_api_repository
         self.default_alert_repository = default_alert_repository
         self.default_alert_api_repository = default_alert_api_repository
+        self.blackout_repository = blackout_repository
         self.save_use_case = SaveAlertsUseCase(alert_repository)
         self.get_all_use_case = GetAllAlertsUseCase(alert_repository)
         self.get_solution_view_use_case = GetSolutionViewUseCase(
@@ -172,6 +175,11 @@ class AlertService(AlertServicePort):
     def get_active_blackouts(self, solution: Optional[str] = None) -> List[Blackout]:
         self.logger.info(f'get_active_blackouts solution={solution}')
         blackouts = self.alertmanager_adapter.fetch_active_blackouts()
+        if blackouts:
+            try:
+                self.blackout_repository.upsert_batch(blackouts)
+            except Exception as exc:
+                self.logger.warning(f"No se pudieron persistir los silencios: {exc}")
         if solution:
             blackouts = [b for b in blackouts if self._blackout_matches_solution(b, solution)]
         return blackouts
