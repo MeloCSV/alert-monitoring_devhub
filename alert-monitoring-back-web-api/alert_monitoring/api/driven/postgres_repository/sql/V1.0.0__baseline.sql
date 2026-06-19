@@ -1,12 +1,11 @@
 CREATE TABLE alert_app (
-    id                   BIGSERIAL       NOT NULL,
+    id                   UUID            NOT NULL DEFAULT gen_random_uuid(),
     name                 VARCHAR(255)    NOT NULL,
     description          TEXT            NOT NULL,
     source_tool          VARCHAR(255)    NULL,
     severity             VARCHAR(50)     NOT NULL,
     chips                JSONB           NOT NULL DEFAULT '[]',
     environments         JSONB           NOT NULL DEFAULT '[]',
-    microservice         VARCHAR(255)    NULL,
     solution             VARCHAR(255)    NULL,
     notification_channel VARCHAR(255)    NULL,
     CONSTRAINT alert_app_pkey PRIMARY KEY (id)
@@ -16,7 +15,7 @@ CREATE INDEX ix_alert_app_name ON alert_app (name);
 
 
 CREATE TABLE default_alert_app (
-    id                   BIGSERIAL       NOT NULL,
+    id                   UUID            NOT NULL DEFAULT gen_random_uuid(),
     raw_name             VARCHAR(255)    NOT NULL,
     display_name         VARCHAR(500)    NOT NULL,
     raw_description      TEXT,
@@ -32,7 +31,7 @@ CREATE TABLE default_alert_app (
 
 
 CREATE TABLE catalog_apps (
-    id        SERIAL          NOT NULL,
+    id        UUID            NOT NULL DEFAULT gen_random_uuid(),
     object_id VARCHAR(50)     NOT NULL,
     name      VARCHAR(500)    NOT NULL,
     csw_code  VARCHAR(100)    NOT NULL,
@@ -44,7 +43,7 @@ CREATE INDEX idx_catalog_apps_name ON catalog_apps (name);
 
 
 CREATE TABLE catalog_app_api (
-    id           SERIAL       NOT NULL,
+    id           UUID         NOT NULL DEFAULT gen_random_uuid(),
     app          VARCHAR(500) NOT NULL,
     microservice VARCHAR(500) NOT NULL,
     apis         JSONB        NOT NULL DEFAULT '[]',
@@ -54,8 +53,9 @@ CREATE TABLE catalog_app_api (
 
 CREATE INDEX idx_catalog_app_api_app ON catalog_app_api (app);
 
+
 CREATE TABLE alert_api (
-    id                   BIGSERIAL       NOT NULL,
+    id                   UUID            NOT NULL DEFAULT gen_random_uuid(),
     rule_id              VARCHAR(100)    NOT NULL,
     name                 VARCHAR(500)    NOT NULL,
     severity             VARCHAR(50),
@@ -68,7 +68,7 @@ CREATE TABLE alert_api (
 
 
 CREATE TABLE default_alert_api (
-    id                   BIGSERIAL    NOT NULL,
+    id                   UUID         NOT NULL DEFAULT gen_random_uuid(),
     raw_name             VARCHAR(255) NOT NULL,
     display_name         VARCHAR(500) NOT NULL,
     raw_description      TEXT,
@@ -79,3 +79,24 @@ CREATE TABLE default_alert_api (
     CONSTRAINT default_alert_api_pkey PRIMARY KEY (id),
     CONSTRAINT default_alert_api_raw_name_key UNIQUE (raw_name)
 );
+
+
+CREATE TABLE blackout (
+    id               UUID         NOT NULL DEFAULT gen_random_uuid(),
+    alertmanager_id  VARCHAR(255) NOT NULL,
+    matchers         JSONB        NOT NULL DEFAULT '[]',
+    starts_at        TIMESTAMPTZ  NULL,
+    ends_at          TIMESTAMPTZ  NULL,
+    created_by       VARCHAR(255) NULL,
+    comment          TEXT         NULL,
+    state            VARCHAR(50)  NOT NULL DEFAULT 'active',
+    source           VARCHAR(255) NULL,
+    app_name         VARCHAR(255) NULL,
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT blackout_pkey PRIMARY KEY (id),
+    CONSTRAINT blackout_alertmanager_id_key UNIQUE (alertmanager_id)
+);
+
+CREATE INDEX idx_blackout_state ON blackout (state);
+CREATE INDEX idx_blackout_source ON blackout (source);
+CREATE INDEX idx_blackout_app_name ON blackout (app_name);
