@@ -1,0 +1,125 @@
+# Traducciones de nombres técnicos de alertas por defecto para mostrar en la UI.
+# Añadir aquí nuevas entradas cuando aparezcan alertas por defecto en Prometheus/Kibana
+# sin necesidad de tocar código ni redesplegar.
+#
+# Formato:
+#   raw_name:
+#     display_name: "Nombre legible"
+#     display_description: "Descripción detallada"
+
+Default_Service_Status_KO:
+  display_name: "Servicio sin réplicas activas"
+  display_description: "El microservicio no tiene ninguna réplica levantada. El servicio está completamente caído y no puede atender peticiones."
+
+Default_Service_Status_Degraded:
+  display_name: "Servicio con réplicas insuficientes"
+  display_description: "El microservicio no tiene todas sus réplicas disponibles. El servicio funciona de forma degradada con menos instancias de las configuradas."
+
+Default_Deployment_Status_Unavailable:
+  display_name: "Deployment no disponible"
+  display_description: "El deployment no está disponible según Kubernetes. La condición 'Available' es false durante más de 10 minutos."
+
+Default_High_4xx_Http_Requests_Principal:
+  display_name: "Alto porcentaje de errores HTTP 4xx (>5%)"
+  display_description: "Más del 5% de las peticiones HTTP están respondiendo con errores 4xx (p. ej. 404 Not Found, 401 Unauthorized). Puede indicar peticiones incorrectas o problemas de configuración."
+
+Default_High_5xx_Http_Requests_Principal:
+  display_name: "Alto porcentaje de errores HTTP 5xx (>5%)"
+  display_description: "Más del 5% de las peticiones HTTP están respondiendo con errores 5xx (errores internos del servidor). El servicio está fallando al procesar las peticiones."
+
+Default_High_4xx_Http_Requests_Critical:
+  display_name: "Porcentaje crítico de errores HTTP 4xx (>10%)"
+  display_description: "Más del 10% de las peticiones HTTP están respondiendo con errores 4xx. Nivel crítico de errores de cliente que requiere atención inmediata."
+
+Default_High_5xx_Http_Requests_Critical:
+  display_name: "Porcentaje crítico de errores HTTP 5xx (>10%)"
+  display_description: "Más del 10% de las peticiones HTTP están respondiendo con errores 5xx (errores internos del servidor). Nivel crítico de fallos que requiere atención inmediata."
+
+Default_JobFailed:
+  display_name: "Job de Kubernetes finalizado con error"
+  display_description: "Un job de Kubernetes ha terminado en estado fallido. Puede tratarse de un CronJob que no se ejecutó correctamente."
+
+Default_JobSuspended:
+  display_name: "Job de Kubernetes suspendido"
+  display_description: "Un job de Kubernetes está en estado suspendido. No ejecutará ninguna tarea hasta que sea reanudado manualmente."
+
+Default_JobExecutionMissed:
+  display_name: "Job no ejecutado según su planificación"
+  display_description: "Un job programado lleva más de 5 minutos en estado Pending o Unknown. El pod no se ha ejecutado en el tiempo esperado."
+
+Default_CPURequestQuotaReached:
+  display_name: "Cuota de CPU request al 90%"
+  display_description: "El namespace ha consumido el 90% de su cuota de CPU (requests). Si se alcanza el 100%, Kubernetes no podrá programar nuevos pods en este namespace."
+
+Default_MemoryLimitQuotaReached:
+  display_name: "Cuota de memoria limit al 90%"
+  display_description: "El namespace ha consumido el 90% de su cuota de memoria (limits). Superar el límite puede provocar que Kubernetes elimine pods por exceso de memoria."
+
+Default_MemoryRequestQuotaReached:
+  display_name: "Cuota de memoria request al 90%"
+  display_description: "El namespace ha consumido el 90% de su cuota de memoria (requests). Si se alcanza el 100%, Kubernetes no podrá programar nuevos pods en este namespace."
+
+Default_CpuUsageHigh:
+  display_name: "Uso de CPU superior al 90% del límite"
+  display_description: "El namespace está usando más del 90% de su límite de CPU. Esto puede causar throttling (ralentización) en los servicios y degradar el rendimiento."
+
+Default_HPAMaximumReplicasForTooLong:
+  display_name: "HPA en máximo de réplicas durante más de 1 hora"
+  display_description: "El autoescalador horizontal (HPA) lleva más de 1 hora con el número máximo de réplicas activas. No puede escalar más y el sistema podría estar bajo una presión sostenida."
+
+# Kibana global alerts
+"Errores Totales 15% GCP (old)":
+  display_name: "Errores Totales 15% GCP (old)"
+  display_description: "Errores 5XX totales en GCP ha llegado al 15% en los últimos 10 segundos."
+
+"Errores Totales 15% OCP [old]":
+  display_name: "Errores Totales 15% OCP [old]"
+  display_description: "Errores 5XX totales en OCP ha llegado al 15% en los últimos 10 segundos."
+
+"Errores Totales 15% OCP SOAP [old]":
+  display_name: "Errores Totales 15% OCP SOAP [old]"
+  display_description: "Errores 5XX totales en OCP (SOAP) ha llegado al 15% en los últimos 10 segundos."
+
+"SLAs - Test":
+  display_name: "SLAs - Test"
+  display_description: "La duración de las peticiones está superando el SLA definido."
+
+"SLAs - Deterioro del servicio":
+  display_name: "SLAs - Deterioro del servicio"
+  display_description: "La latencia de las peticiones ha superado el SLA definido del servicio."
+
+"Errores Totales 15% GCP":
+  display_name: "Errores Totales 15% GCP"
+  display_description: "Errores 5XX totales en GCP ha llegado al 15% en los últimos 2 minutos."
+
+"Errores Totales 15% OCP SOAP":
+  display_name: "Errores Totales 15% OCP SOAP"
+  display_description: "Errores 5XX totales en OCP (SOAP) ha llegado al 15% en los últimos 2 minutos."
+
+"Errores 500 por API y método":
+  display_name: "Errores 500 por API y método"
+  display_description: "El ratio de errores 5XX ha superado el umbral para una API y método concretos."
+
+"Errores 500 por pod [OCP] [SOAP]":
+  display_name: "Errores 500 por pod [OCP] [SOAP]"
+  display_description: "El ratio de errores en un pod de OCP (SOAP) ha alcanzado el 100%."
+
+"Errores 500 por pod [OCP]":
+  display_name: "Errores 500 por pod [OCP]"
+  display_description: "El ratio de errores en un pod de OCP ha alcanzado el 100%."
+
+"Errores Totales 15% OCP":
+  display_name: "Errores Totales 15% OCP"
+  display_description: "Errores 5XX totales en OCP ha llegado al 15% en los últimos 2 minutos."
+
+"SLAs - Afectación del servicio":
+  display_name: "SLAs - Afectación del servicio"
+  display_description: "La duración de las peticiones está superando el SLA definido del método."
+
+"Errores 400 por API y método":
+  display_name: "Errores 400 por API y método"
+  display_description: "El ratio de errores 4XX ha superado el umbral para una API y método concretos."
+
+"Errores 500 por pod [GCP]":
+  display_name: "Errores 500 por pod [GCP]"
+  display_description: "El ratio de errores en un pod de GCP ha alcanzado el 100%."
