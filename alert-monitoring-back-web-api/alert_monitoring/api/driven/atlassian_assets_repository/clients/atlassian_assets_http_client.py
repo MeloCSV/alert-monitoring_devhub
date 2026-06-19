@@ -5,6 +5,7 @@ from typing import List
 import httpx
 
 from alert_monitoring.api.driven.atlassian_assets_repository.models.atlassian_assets_config import AtlassianAssetsConfig
+from alert_monitoring.api.driven.http_retry import with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -28,13 +29,24 @@ class AtlassianAssetsHttpClient:
 
         objects: List[dict] = []
         start_at = 0
+        page_num = 0
 
         with httpx.Client(verify=config.verify_ssl, timeout=DEFAULT_TIMEOUT) as client:
             while True:
+                page_num += 1
+                if page_num > config.max_pages:
+                    logger.warning(
+                        "Se alcanzó max_pages=%d en Atlassian Assets; puede haber objetos sin sincronizar.",
+                        config.max_pages,
+                    )
+                    break
+
                 params = {"startAt": start_at, "maxResults": config.page_size}
                 try:
-                    response = client.post(url, headers=headers, params=params, json=body)
-                    response.raise_for_status()
+                    response = with_retry(
+                        lambda: self._post_page(client, url, headers, params, body),
+                        label=f"AtlassianAssets startAt={start_at}",
+                    )
                 except httpx.HTTPError as exc:
                     logger.error("Error al consultar Atlassian Assets (startAt=%s): %s", start_at, exc)
                     break
@@ -52,6 +64,18 @@ class AtlassianAssetsHttpClient:
 
         logger.info("Recuperados %d objetos del catálogo Atlassian Assets", len(objects))
         return objects
+
+    @staticmethod
+    def _post_page(
+        client: httpx.Client,
+        url: str,
+        headers: dict,
+        params: dict,
+        body: dict,
+    ) -> httpx.Response:
+        response = client.post(url, headers=headers, params=params, json=body)
+        response.raise_for_status()
+        return response
 
     @staticmethod
     def extract_attribute(attributes: List[dict], attribute_id: str) -> str | None:

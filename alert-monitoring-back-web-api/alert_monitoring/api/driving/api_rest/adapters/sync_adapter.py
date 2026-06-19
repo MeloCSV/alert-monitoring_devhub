@@ -1,8 +1,11 @@
+import os
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor, Future
+from concurrent.futures import ThreadPoolExecutor, Future, TimeoutError as FuturesTimeoutError
 from logging import Logger
 from typing import Any, Dict
+
+_TASK_TIMEOUT_SECS = int(os.getenv("SYNC_TASK_TIMEOUT", "120"))
 
 from fastapi import Depends
 from fwkpy_lib_fastapi.public.observability import TracingRouter
@@ -90,13 +93,22 @@ def sync_global(
         _sync_duration.record(duration_ms, {"operation": "global", "status": "error"})
         return JSONResponse(status_code=500, content=results)
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    executor = ThreadPoolExecutor(max_workers=3)
+    try:
         futures: Dict[str, Future] = {
             "alerts_prometheus": executor.submit(_run_isolated, alert_service.sync_prometheus_alerts),
             "alerts_elastic": executor.submit(_run_isolated, alert_service.sync_elastic_alerts),
             "alert_api": executor.submit(_run_isolated, alert_api_service.sync_alert_apis),
         }
-    results.update({name: future.result() for name, future in futures.items()})
+        for name, future in futures.items():
+            try:
+                results[name] = future.result(timeout=_TASK_TIMEOUT_SECS)
+            except FuturesTimeoutError:
+                results[name] = {"error": f"Timeout tras {_TASK_TIMEOUT_SECS}s"}
+                logger.error("sync_global: tarea '%s' superó timeout de %ds", name, _TASK_TIMEOUT_SECS)
+                _sync_errors.add(1, {"operation": name})
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
     for op in ["alerts_prometheus", "alerts_elastic", "alert_api"]:
         if "error" in results.get(op, {}):
