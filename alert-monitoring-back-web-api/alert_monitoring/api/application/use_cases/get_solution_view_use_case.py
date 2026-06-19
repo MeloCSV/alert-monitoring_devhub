@@ -1,5 +1,5 @@
 import re
-from typing import List, Set, Tuple
+from typing import List, Tuple
 
 from alert_monitoring.api.application.ports.driven.alert_repository_port import AlertRepositoryPort
 from alert_monitoring.api.application.ports.driven.default_alert_repository_port import DefaultAlertRepositoryPort
@@ -19,9 +19,8 @@ class GetSolutionViewUseCase:
     def execute(self, solution: str) -> SolutionView:
         alerts = self.alert_repository.get_all(AlertFilter(solution=solution))
         channels = sorted({a.notification_channel for a in alerts if a.notification_channel})
-        micros = {a.microservice for a in alerts if a.microservice}
         default_alerts = [
-            _to_default_view(d, solution, micros)
+            _to_default_view(d, solution)
             for d in self.default_alert_repository.get_all()
         ]
 
@@ -33,8 +32,8 @@ class GetSolutionViewUseCase:
         )
 
 
-def _to_default_view(default_alert: DefaultAlert, solution: str, micros: Set[str]) -> DefaultAlertView:
-    is_disabled, is_partial, chips = _evaluate(default_alert, solution, micros)
+def _to_default_view(default_alert: DefaultAlert, solution: str) -> DefaultAlertView:
+    is_disabled, is_partial, chips = _evaluate(default_alert, solution)
     return DefaultAlertView(
         raw_name=default_alert.raw_name,
         name=default_alert.display_name,
@@ -48,31 +47,24 @@ def _to_default_view(default_alert: DefaultAlert, solution: str, micros: Set[str
     )
 
 
-def _evaluate(default_alert: DefaultAlert, solution: str, micros: Set[str]) -> Tuple[bool, bool, List[str]]:
+def _evaluate(default_alert: DefaultAlert, solution: str) -> Tuple[bool, bool, List[str]]:
     ns_fully_excluded = False
     ns_re_included = False
     partially_excluded = False
     excluded_items: List[str] = []
 
-    targets = {solution} | micros
-
     for alt in default_alert.excluded_namespaces:
-        matched_target = False
-        for target in targets:
-            if _regex_matches(target, alt):
-                ns_fully_excluded = True
-                matched_target = True
-            elif _is_prefix_of(target, alt):
-                partially_excluded = True
-                matched_target = True
-        if matched_target:
+        if _regex_matches(solution, alt):
+            ns_fully_excluded = True
+            _append_unique(excluded_items, _display_pattern(alt))
+        elif _is_prefix_of(solution, alt):
+            partially_excluded = True
             _append_unique(excluded_items, _display_pattern(alt))
 
     for incl in default_alert.included_namespaces:
-        for target in targets:
-            if _regex_matches(target, incl):
-                ns_re_included = True
-                break
+        if _regex_matches(solution, incl):
+            ns_re_included = True
+            break
 
     excluded_items = [
         item for item in excluded_items
@@ -80,13 +72,8 @@ def _evaluate(default_alert: DefaultAlert, solution: str, micros: Set[str]) -> T
     ]
 
     for alt in default_alert.excluded_jobs:
-        matched_target = False
-        for target in targets:
-            if _is_prefix_of(target, alt):
-                partially_excluded = True
-                matched_target = True
-                break
-        if matched_target:
+        if _is_prefix_of(solution, alt):
+            partially_excluded = True
             _append_unique(excluded_items, _display_pattern(alt))
 
     is_disabled = ns_fully_excluded and not ns_re_included

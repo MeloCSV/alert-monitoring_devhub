@@ -150,15 +150,15 @@ class TestGetSolutionViewUseCase:
         assert view.is_partial is False
         assert view.chips == []
 
-    def test_should_mark_default_alert_as_partial_when_microservice_excluded(
+    def test_should_mark_default_alert_as_partial_when_solution_prefix_excluded(
         self, use_case, alert_repo, default_alert_repo
     ):
         """
-        Given default alert that excludes a microservice prefix
-        When execute for solution with matching microservices
-        Then is_partial should be True with the microservice in chips
+        Given default alert that excludes a namespace pattern that partially matches the solution
+        When execute for that solution
+        Then is_partial should be True with the excluded pattern in chips
         """
-        alert_repo.get_all.return_value = [_make_alert(microservice='my-app-back')]
+        alert_repo.get_all.return_value = []
         default_alert_repo.get_all.return_value = [
             _make_default_alert(excluded_namespaces=['my-app-back-.*'])
         ]
@@ -234,13 +234,13 @@ class TestGetSolutionViewEdgeCases:
 
     def test_excluded_jobs_causes_partial(self):
         default = _make_default_alert(excluded_jobs=['my-app-worker'])
-        is_disabled, is_partial, chips = _evaluate(default, 'my-app', set())
+        is_disabled, is_partial, chips = _evaluate(default, 'my-app')
         assert is_partial is True
         assert 'my-app-worker' in chips
 
     def test_excluded_jobs_not_triggered_when_no_prefix_match(self):
         default = _make_default_alert(excluded_jobs=['other-worker'])
-        is_disabled, is_partial, chips = _evaluate(default, 'my-app', set())
+        is_disabled, is_partial, chips = _evaluate(default, 'my-app')
         assert is_partial is False
 
     def test_regex_matches_returns_false_for_invalid_regex(self):
