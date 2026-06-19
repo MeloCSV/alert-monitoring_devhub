@@ -8,4 +8,5 @@ class AtlassianAssetsConfig(BaseModel):
     token: str
     object_type_id: str
     page_size: int = 100
+    max_pages: int = 200
     verify_ssl: bool = True

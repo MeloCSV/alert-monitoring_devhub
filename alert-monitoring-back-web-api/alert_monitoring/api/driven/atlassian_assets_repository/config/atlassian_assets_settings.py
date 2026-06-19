@@ -11,6 +11,7 @@ EMAIL_VAR = "ATLASSIAN_ASSETS_EMAIL"
 TOKEN_VAR = "ATLASSIAN_ASSETS_TOKEN"
 OBJECT_TYPE_ID_VAR = "ATLASSIAN_ASSETS_OBJECT_TYPE_ID"
 PAGE_SIZE_VAR = "ATLASSIAN_ASSETS_PAGE_SIZE"
+MAX_PAGES_VAR = "ATLASSIAN_ASSETS_MAX_PAGES"
 
 DEFAULT_BASE_URL = "https://api.atlassian.com/jsm/assets"
 
@@ -38,4 +39,5 @@ def load_atlassian_assets_config() -> AtlassianAssetsConfig | None:
         token=token,
         object_type_id=object_type_id,
         page_size=int(os.environ.get(PAGE_SIZE_VAR, "100")),
+        max_pages=int(os.environ.get(MAX_PAGES_VAR, "200")),
     )

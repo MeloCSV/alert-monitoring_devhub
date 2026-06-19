@@ -4,6 +4,7 @@ from typing import List
 import httpx
 
 from alert_monitoring.api.driven.kibana_repository.models.kibana_config import KibanaConfig
+from alert_monitoring.api.driven.http_retry import with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +27,10 @@ class KibanaHttpClient:
             for page in range(1, config.max_pages + 1):
                 params = {"page": page, "per_page": config.per_page}
                 try:
-                    response = client.get(url, headers=headers, params=params)
-                    response.raise_for_status()
+                    response = with_retry(
+                        lambda: self._get_page(client, url, headers, params),
+                        label=f"Kibana {config.name} page={page}",
+                    )
                 except httpx.HTTPError as exc:
                     logger.error("Error al consultar reglas en Kibana %s (page=%s): %s", config.name, page, exc)
                     return rules
@@ -50,6 +53,12 @@ class KibanaHttpClient:
                 )
 
         return rules
+
+    @staticmethod
+    def _get_page(client: httpx.Client, url: str, headers: dict, params: dict) -> httpx.Response:
+        response = client.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        return response
 
     def _build_url(self, config: KibanaConfig) -> str:
         base = config.base_url.rstrip("/")

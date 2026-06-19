@@ -4,6 +4,7 @@ from typing import List
 import httpx
 
 from alert_monitoring.api.driven.alertmanager_repository.models.alertmanager_config import AlertManagerConfig
+from alert_monitoring.api.driven.http_retry import with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +21,13 @@ class AlertManagerHttpClient:
         if config.token:
             headers["Authorization"] = f"Bearer {config.token}"
         extensions = {"sni_hostname": config.sni_hostname} if config.sni_hostname else None
+
         try:
-            request = httpx.Request("GET", url, headers=headers, extensions=extensions)
             with httpx.Client(verify=config.verify_ssl, timeout=DEFAULT_TIMEOUT) as client:
-                response = client.send(request)
-            response.raise_for_status()
+                response = with_retry(
+                    lambda: self._fetch(client, url, headers, extensions),
+                    label=f"AlertManager {config.name}",
+                )
         except httpx.HTTPError as exc:
             logger.error("Error al consultar silencios en AlertManager %s: %s", config.name, exc)
             return []
@@ -34,3 +37,10 @@ class AlertManagerHttpClient:
             logger.error("Respuesta inesperada de %s: se esperaba lista de silencios", config.name)
             return []
         return payload
+
+    @staticmethod
+    def _fetch(client: httpx.Client, url: str, headers: dict, extensions: dict | None) -> httpx.Response:
+        request = httpx.Request("GET", url, headers=headers, extensions=extensions)
+        response = client.send(request)
+        response.raise_for_status()
+        return response
