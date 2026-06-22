@@ -38,6 +38,19 @@ def sync_prometheus_alerts(
     )
 
 
+@router.post('/alerts/sync/blackouts', tags=['alerts'], status_code=201, responses=_ERROR_500)
+def sync_blackouts(
+    alert_service: AlertServicePort = Depends(Injector.instance(AlertServicePort)),
+    logger: Logger = Depends(Injector.instance(LoggerSetup, "LoggerSetup.get_logger")),
+) -> JSONResponse:
+    logger.info('sync_blackouts')
+    synced = alert_service.sync_blackouts()
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED,
+        content={"message": "Silencios sincronizados correctamente", "synced": synced},
+    )
+
+
 @router.post('/alerts/sync/elastic', tags=['alerts'], status_code=201, responses=_ERROR_500)
 def sync_elastic_alerts(
     alert_service: AlertServicePort = Depends(Injector.instance(AlertServicePort)),
