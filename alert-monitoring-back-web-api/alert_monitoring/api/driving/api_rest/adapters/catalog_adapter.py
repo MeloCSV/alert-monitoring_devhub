@@ -17,7 +17,7 @@ router = APIRouter()
 _ERROR_500 = {500: {'model': str}}
 
 
-@router.post('/catalog/sync', tags=['catalog'], status_code=201, responses=_ERROR_500)
+@router.post('/catalog/app/sync', tags=['catalog/app'], status_code=201, responses=_ERROR_500)
 def sync_catalog(
     catalog_service: CatalogServicePort = Depends(Injector.instance(CatalogServicePort)),
     logger: Logger = Depends(Injector.instance(LoggerSetup, "LoggerSetup.get_logger")),
@@ -30,7 +30,7 @@ def sync_catalog(
     )
 
 
-@router.get('/catalog', tags=['catalog'], response_model=List[CatalogAppResponse], responses=_ERROR_500)
+@router.get('/catalog/app', tags=['catalog/app'], response_model=List[CatalogAppResponse], responses=_ERROR_500)
 def get_catalog_apps(
     name: Optional[str] = Query(None, description="Filtra por nombre de aplicación (coincidencia parcial)"),
     catalog_service: CatalogServicePort = Depends(Injector.instance(CatalogServicePort)),

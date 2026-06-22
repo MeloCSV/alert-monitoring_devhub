@@ -8,7 +8,9 @@ from fwkpy_lib_core.common.injector import Injector
 from fwkpy_lib_utils.common.observability.logger.logger_setup import LoggerSetup
 
 from alert_monitoring.api.application.ports.driving.alert_api_service_port import AlertApiServicePort
+from alert_monitoring.api.application.ports.driving.alert_service_port import AlertServicePort
 from alert_monitoring.api.driving.api_rest.models.alert_api_response import AlertApiResponse
+from alert_monitoring.api.driving.api_rest.models.api_solution_view_response import DefaultAlertApiViewResponse, ApiSolutionViewResponse
 from alert_monitoring.api.driving.api_rest.responses import ok_json, ok_list
 
 
@@ -48,3 +50,21 @@ def get_alert_api_rules(
     logger.info(f'get_alert_api_rules api={api}')
     rules = service.get_alert_apis(api=api)
     return ok_list(AlertApiResponse, rules)
+
+
+@router.get('/alert-api/overview/{app}', tags=['alert-api'], response_model=ApiSolutionViewResponse, responses=_ERROR_500)
+def get_alert_api_overview(
+    app: str,
+    alert_service: AlertServicePort = Depends(Injector.instance(AlertServicePort)),
+    logger: Logger = Depends(Injector.instance(LoggerSetup, "LoggerSetup.get_logger")),
+) -> JSONResponse:
+    logger.info('get_alert_api_overview')
+    view = alert_service.get_api_solution_view(app)
+    payload = ApiSolutionViewResponse(
+        app=view.app,
+        default_alerts=[DefaultAlertApiViewResponse(**d.model_dump()) for d in view.default_alerts],
+        adhoc_alerts=[AlertApiResponse(**a.model_dump()) for a in view.adhoc_alerts],
+        api_microservice_map=view.api_microservice_map,
+        channels=view.channels,
+    )
+    return ok_json(payload)
