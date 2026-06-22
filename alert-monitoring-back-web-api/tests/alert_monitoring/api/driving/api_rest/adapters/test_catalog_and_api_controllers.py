@@ -38,12 +38,12 @@ class TestCatalogControllerAdapter:
     def test_should_sync_catalog_and_return_201(self, mock_sync):
         """
         Given valid request
-        When POST /catalog/sync
+        When POST /catalog/app/sync
         Then should return 201 with count of synced items
         """
         mock_sync.return_value = 15
 
-        response = self.client.post('/catalog/sync')
+        response = self.client.post('/catalog/app/sync')
 
         assert response.status_code == 201
         data = response.json()
@@ -54,14 +54,14 @@ class TestCatalogControllerAdapter:
     def test_should_get_catalog_apps_and_return_200(self, mock_get):
         """
         Given catalog apps exist
-        When GET /catalog
+        When GET /catalog/app
         Then should return list of catalog apps
         """
         mock_get.return_value = [
             CatalogApp(object_id='1', name='My-App', csw_code='CSW001'),
         ]
 
-        response = self.client.get('/catalog')
+        response = self.client.get('/catalog/app')
 
         assert response.status_code == 200
         data = response.json()
@@ -73,12 +73,12 @@ class TestCatalogControllerAdapter:
     def test_should_pass_name_filter_to_catalog_service(self, mock_get):
         """
         Given name query param
-        When GET /catalog?name=my-app
+        When GET /catalog/app?name=my-app
         Then should return filtered catalog apps
         """
         mock_get.return_value = []
 
-        response = self.client.get('/catalog?name=my-app')
+        response = self.client.get('/catalog/app?name=my-app')
 
         assert response.status_code == 200
         mock_get.assert_called_once_with(name='my-app')
@@ -87,12 +87,12 @@ class TestCatalogControllerAdapter:
     def test_catalog_returns_empty_list_when_no_apps(self, mock_get):
         """
         Given no apps in catalog
-        When GET /catalog
+        When GET /catalog/app
         Then should return empty list
         """
         mock_get.return_value = []
 
-        response = self.client.get('/catalog')
+        response = self.client.get('/catalog/app')
 
         assert response.status_code == 200
         assert response.json() == []
@@ -190,12 +190,12 @@ class TestCatalogAppApiControllerAdapter:
     def test_should_sync_catalog_app_api_and_return_201(self, mock_sync):
         """
         Given valid request
-        When POST /catalog-api/sync
+        When POST /catalog/api/sync
         Then should return 201 with count of synced items
         """
         mock_sync.return_value = 8
 
-        response = self.client.post('/catalog-api/sync')
+        response = self.client.post('/catalog/api/sync')
 
         assert response.status_code == 201
         data = response.json()
@@ -205,14 +205,14 @@ class TestCatalogAppApiControllerAdapter:
     def test_should_get_catalog_app_api_and_return_200(self, mock_get):
         """
         Given catalog app-api entries exist
-        When GET /catalog-api
+        When GET /catalog/api
         Then should return list of entries
         """
         mock_get.return_value = [
             CatalogAppApi(app='my-app', microservice='my-app-back', apis=['absence'])
         ]
 
-        response = self.client.get('/catalog-api')
+        response = self.client.get('/catalog/api')
 
         assert response.status_code == 200
         data = response.json()
@@ -224,12 +224,12 @@ class TestCatalogAppApiControllerAdapter:
     def test_should_pass_app_filter(self, mock_get):
         """
         Given app query param
-        When GET /catalog-api?app=my-app
+        When GET /catalog/api?app=my-app
         Then should pass filter to service
         """
         mock_get.return_value = []
 
-        response = self.client.get('/catalog-api?app=my-app')
+        response = self.client.get('/catalog/api?app=my-app')
 
         assert response.status_code == 200
         mock_get.assert_called_once_with(app='my-app')
