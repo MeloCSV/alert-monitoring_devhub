@@ -52,13 +52,13 @@ def get_alert_api_rules(
     return ok_list(AlertApiResponse, rules)
 
 
-@router.get('/alert-api/view', tags=['alert-api'], response_model=ApiSolutionViewResponse, responses=_ERROR_500)
-def get_api_solution_view(
-    app: str = Query(..., description="Aplicación para la que se construye la vista de alarmado de APIs"),
+@router.get('/alert-api/overview/{app}', tags=['alert-api'], response_model=ApiSolutionViewResponse, responses=_ERROR_500)
+def get_alert_api_overview(
+    app: str,
     alert_service: AlertServicePort = Depends(Injector.instance(AlertServicePort)),
     logger: Logger = Depends(Injector.instance(LoggerSetup, "LoggerSetup.get_logger")),
 ) -> JSONResponse:
-    logger.info('get_api_solution_view')
+    logger.info('get_alert_api_overview')
     view = alert_service.get_api_solution_view(app)
     payload = ApiSolutionViewResponse(
         app=view.app,

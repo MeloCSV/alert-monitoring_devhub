@@ -84,14 +84,14 @@ def get_default_alerts(
     return ok_list(DefaultAlertResponse, defaults)
 
 
-@router.get('/alert-app/view', tags=['alert-app'], response_model=SolutionViewResponse, responses=_ERROR_500)
-def get_solution_view(
-    solution: str = Query(..., description="Aplicación para la que se construye la vista completa"),
+@router.get('/alert-app/overview/{app}', tags=['alert-app'], response_model=SolutionViewResponse, responses=_ERROR_500)
+def get_alert_app_overview(
+    app: str,
     alert_service: AlertServicePort = Depends(Injector.instance(AlertServicePort)),
     logger: Logger = Depends(Injector.instance(LoggerSetup, "LoggerSetup.get_logger")),
 ) -> JSONResponse:
-    logger.info('get_solution_view')
-    view = alert_service.get_solution_view(solution)
+    logger.info('get_alert_app_overview')
+    view = alert_service.get_solution_view(app)
     payload = SolutionViewResponse(
         app=view.app,
         default_alerts=[DefaultAlertViewResponse(**d.model_dump()) for d in view.default_alerts],

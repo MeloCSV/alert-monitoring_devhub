@@ -195,7 +195,7 @@ class TestAlertControllerAdapter:
     def test_should_get_solution_view_and_return_200(self, mock_get):
         """
         Given valid solution param
-        When GET /alert-app/view?solution=my-app
+        When GET /alert-app/overview/{app}
         Then should return solution view and status 200
         """
         mock_get.return_value = SolutionView(
@@ -214,7 +214,7 @@ class TestAlertControllerAdapter:
             channels=['Microsoft Teams'],
         )
 
-        response = self.client.get('/alert-app/view?solution=my-app')
+        response = self.client.get('/alert-app/overview/my-app')
 
         assert response.status_code == 200
         data = response.json()
@@ -227,7 +227,7 @@ class TestAlertControllerAdapter:
     def test_should_get_api_solution_view_and_return_200(self, mock_get):
         """
         Given valid app param
-        When GET /alert-api/view?app=my-app
+        When GET /alert-api/overview/{app}
         Then should return API solution view and status 200
         """
         mock_get.return_value = ApiSolutionView(
@@ -248,7 +248,7 @@ class TestAlertControllerAdapter:
             channels=['ServiceNow'],
         )
 
-        response = self.client.get('/alert-api/view?app=my-app')
+        response = self.client.get('/alert-api/overview/my-app')
 
         assert response.status_code == 200
         data = response.json()
