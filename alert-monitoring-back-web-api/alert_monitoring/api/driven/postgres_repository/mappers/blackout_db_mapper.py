@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import List
 
 from alert_monitoring.api.domain.models.blackout import Blackout, BlackoutMatcher
@@ -11,6 +12,13 @@ _APP_MATCHER_FIELDS = frozenset({
 
 class BlackoutDBMapper:
 
+    def _parse_dt(self, value: str | datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value
+        return datetime.fromisoformat(value.replace('Z', '+00:00'))
+
     def _extract_app_name(self, blackout: Blackout) -> str | None:
         for matcher in blackout.matchers:
             if matcher.name in _APP_MATCHER_FIELDS and matcher.is_equal and not matcher.is_regex:
@@ -21,8 +29,8 @@ class BlackoutDBMapper:
         return BlackoutDB(
             alertmanager_id=blackout.id,
             matchers=[m.model_dump() for m in blackout.matchers],
-            starts_at=blackout.starts_at,
-            ends_at=blackout.ends_at,
+            starts_at=self._parse_dt(blackout.starts_at),
+            ends_at=self._parse_dt(blackout.ends_at),
             created_by=blackout.created_by,
             comment=blackout.comment,
             state=blackout.state,

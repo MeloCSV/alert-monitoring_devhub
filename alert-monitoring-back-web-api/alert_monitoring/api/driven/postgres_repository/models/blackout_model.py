@@ -13,8 +13,8 @@ class BlackoutDB(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     alertmanager_id: str = Field(unique=True, max_length=255)
     matchers: List[dict] = Field(default=[], sa_column=Column(JSON))
-    starts_at: Optional[str] = None
-    ends_at: Optional[str] = None
+    starts_at: Optional[datetime] = None
+    ends_at: Optional[datetime] = None
     created_by: Optional[str] = None
     comment: Optional[str] = None
     state: str = Field(default="active")
