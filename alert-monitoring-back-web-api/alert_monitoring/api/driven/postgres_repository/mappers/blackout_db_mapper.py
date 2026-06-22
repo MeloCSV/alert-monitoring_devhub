@@ -1,4 +1,6 @@
-from alert_monitoring.api.domain.models.blackout import Blackout
+from typing import List
+
+from alert_monitoring.api.domain.models.blackout import Blackout, BlackoutMatcher
 from alert_monitoring.api.driven.postgres_repository.models.blackout_model import BlackoutDB
 
 _APP_MATCHER_FIELDS = frozenset({
@@ -27,3 +29,18 @@ class BlackoutDBMapper:
             source=blackout.source,
             app_name=self._extract_app_name(blackout),
         )
+
+    def to_domain(self, row: BlackoutDB) -> Blackout:
+        return Blackout(
+            id=row.alertmanager_id,
+            matchers=[BlackoutMatcher(**m) for m in (row.matchers or [])],
+            starts_at=row.starts_at,
+            ends_at=row.ends_at,
+            created_by=row.created_by,
+            comment=row.comment,
+            state=row.state,
+            source=row.source,
+        )
+
+    def to_domain_list(self, rows: List[BlackoutDB]) -> List[Blackout]:
+        return [self.to_domain(row) for row in rows]

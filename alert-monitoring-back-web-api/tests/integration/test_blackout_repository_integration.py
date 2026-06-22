@@ -109,3 +109,38 @@ class TestBlackoutRepositoryIntegration:
         assert len(rows) == 2
         existing = next(r for r in rows if r.alertmanager_id == "id-existing")
         assert existing.comment == "new"
+
+    def test_get_all_returns_active_blackouts(self, repo):
+        """get_all devuelve solo los silencios con state='active'."""
+        repo.upsert_batch([
+            _make_blackout("id-active", state="active"),
+            _make_blackout("id-expired", state="expired"),
+        ])
+
+        result = repo.get_all()
+
+        assert len(result) == 1
+        assert result[0].id == "id-active"
+
+    def test_get_all_maps_domain_fields(self, repo):
+        """get_all devuelve objetos Blackout con todos los campos correctos."""
+        repo.upsert_batch([_make_blackout("id-full")])
+
+        result = repo.get_all()
+
+        assert len(result) == 1
+        b = result[0]
+        assert b.id == "id-full"
+        assert b.state == "active"
+        assert b.source == "alertmanager-prod"
+        assert b.comment == "Silencio de prueba"
+        assert b.created_by == "tester"
+        assert len(b.matchers) == 1
+        assert b.matchers[0].name == "namespace"
+        assert b.matchers[0].value == "my-app"
+
+    def test_get_all_empty_when_no_blackouts(self, repo):
+        """get_all devuelve lista vacía si no hay silencios."""
+        result = repo.get_all()
+
+        assert result == []

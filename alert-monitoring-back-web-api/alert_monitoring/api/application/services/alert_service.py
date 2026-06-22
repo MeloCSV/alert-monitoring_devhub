@@ -213,7 +213,7 @@ class AlertService(AlertServicePort):
 
     def get_active_blackouts(self, solution: Optional[str] = None) -> List[Blackout]:
         self.logger.info(f'get_active_blackouts solution={solution}')
-        blackouts = self.alertmanager_adapter.fetch_active_blackouts()
+        blackouts = self.blackout_repository.get_all()
         if solution:
             blackouts = [b for b in blackouts if self._blackout_matches_solution(b, solution)]
         return blackouts

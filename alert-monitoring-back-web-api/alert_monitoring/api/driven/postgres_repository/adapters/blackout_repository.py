@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from fwkpy_lib_core.common.injector import inject
 from fwkpy_lib_utils.common.observability.logger.logger_setup import LoggerSetup
@@ -44,3 +44,12 @@ class BlackoutRepositoryAdapter(BlackoutRepositoryPort):
             else:
                 self.sqlalchemy_repository.add(db_obj)
         self.sqlalchemy_repository.commit()
+
+    def get_all(self) -> List[Blackout]:
+        self.logger.info("Consultando silencios activos")
+        rows = (
+            self.sqlalchemy_repository.query(BlackoutDB)
+            .filter(BlackoutDB.state == "active")
+            .all()
+        )
+        return self.blackout_db_mapper.to_domain_list(rows)
