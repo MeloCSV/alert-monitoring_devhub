@@ -1,7 +1,8 @@
 from typing import List, Optional
 from logging import Logger
 
-from fwkpy_lib_fastapi.public.observability import TracingRouter, Depends, Query, status
+from fastapi import Depends, Query, status
+from fwkpy_lib_fastapi.public.observability import TracingRouter
 from fastapi.responses import JSONResponse
 
 from fwkpy_lib_core.common.injector import Injector
