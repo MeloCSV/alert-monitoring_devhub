@@ -67,12 +67,12 @@ class TestAlertControllerAdapter:
     def test_should_sync_prometheus_alerts_and_return_201(self, mock_sync):
         """
         Given valid request
-        When POST /alerts/sync
+        When POST /alert-app/sync/prometheus
         Then should return 201 with count of saved rules
         """
         mock_sync.return_value = 42
 
-        response = self.client.post('/alerts/sync')
+        response = self.client.post('/alert-app/sync/prometheus')
 
         assert response.status_code == 201
         assert response.json()['saved'] == 42
@@ -82,12 +82,12 @@ class TestAlertControllerAdapter:
     def test_should_sync_elastic_alerts_and_return_201(self, mock_sync):
         """
         Given valid request
-        When POST /alerts/sync/elastic
+        When POST /alert-app/sync/elastic
         Then should return 201 with count of saved rules
         """
         mock_sync.return_value = 10
 
-        response = self.client.post('/alerts/sync/elastic')
+        response = self.client.post('/alert-app/sync/elastic')
 
         assert response.status_code == 201
         assert response.json()['saved'] == 10
@@ -97,13 +97,13 @@ class TestAlertControllerAdapter:
     def test_should_get_all_alerts_and_return_200(self, mock_get, mock_mapper):
         """
         Given valid request
-        When GET /alerts
+        When GET /alert-app
         Then should return list of alerts and status 200
         """
         mock_get.return_value = [_make_alert()]
         mock_mapper.return_value = [_make_alert_response()]
 
-        response = self.client.get('/alerts')
+        response = self.client.get('/alert-app')
 
         assert response.status_code == 200
         assert isinstance(response.json(), list)
@@ -115,13 +115,13 @@ class TestAlertControllerAdapter:
     def test_should_pass_query_params_as_filters_to_get_all_alerts(self, mock_get, mock_mapper):
         """
         Given query params with filters
-        When GET /alerts
+        When GET /alert-app
         Then should pass filters to the service and return the filtered results
         """
         mock_get.return_value = []
         mock_mapper.return_value = []
 
-        response = self.client.get('/alerts?name=my-alert&severity=critical&solution=my-app')
+        response = self.client.get('/alert-app?name=my-alert&severity=critical&solution=my-app')
 
         assert response.status_code == 200
         call_args = mock_get.call_args[0][0]  # first positional arg after self is AlertFilter
@@ -133,7 +133,7 @@ class TestAlertControllerAdapter:
     def test_should_get_default_alerts_and_return_200(self, mock_get):
         """
         Given valid request
-        When GET /alerts/defaults
+        When GET /alert-app/defaults
         Then should return list of default alerts and status 200
         """
         mock_get.return_value = [
@@ -145,7 +145,7 @@ class TestAlertControllerAdapter:
             )
         ]
 
-        response = self.client.get('/alerts/defaults')
+        response = self.client.get('/alert-app/defaults')
 
         assert response.status_code == 200
         data = response.json()
@@ -157,7 +157,7 @@ class TestAlertControllerAdapter:
     def test_should_get_active_blackouts_and_return_200(self, mock_get):
         """
         Given valid request with solution filter
-        When GET /alerts/blackouts?solution=my-app
+        When GET /silences?solution=my-app
         Then should return list of blackouts and status 200
         """
         mock_get.return_value = [
@@ -169,7 +169,7 @@ class TestAlertControllerAdapter:
             )
         ]
 
-        response = self.client.get('/alerts/blackouts?solution=my-app')
+        response = self.client.get('/silences?solution=my-app')
 
         assert response.status_code == 200
         data = response.json()
@@ -181,12 +181,12 @@ class TestAlertControllerAdapter:
     def test_should_get_blackouts_without_solution_filter(self, mock_get):
         """
         Given request without solution
-        When GET /alerts/blackouts
+        When GET /silences
         Then should return all blackouts
         """
         mock_get.return_value = []
 
-        response = self.client.get('/alerts/blackouts')
+        response = self.client.get('/silences')
 
         assert response.status_code == 200
         assert response.json() == []
@@ -195,7 +195,7 @@ class TestAlertControllerAdapter:
     def test_should_get_solution_view_and_return_200(self, mock_get):
         """
         Given valid solution param
-        When GET /alerts/view?solution=my-app
+        When GET /alert-app/view?solution=my-app
         Then should return solution view and status 200
         """
         mock_get.return_value = SolutionView(
@@ -214,7 +214,7 @@ class TestAlertControllerAdapter:
             channels=['Microsoft Teams'],
         )
 
-        response = self.client.get('/alerts/view?solution=my-app')
+        response = self.client.get('/alert-app/view?solution=my-app')
 
         assert response.status_code == 200
         data = response.json()
@@ -227,7 +227,7 @@ class TestAlertControllerAdapter:
     def test_should_get_api_solution_view_and_return_200(self, mock_get):
         """
         Given valid app param
-        When GET /alerts/api-view?app=my-app
+        When GET /alert-api/view?app=my-app
         Then should return API solution view and status 200
         """
         mock_get.return_value = ApiSolutionView(
@@ -248,7 +248,7 @@ class TestAlertControllerAdapter:
             channels=['ServiceNow'],
         )
 
-        response = self.client.get('/alerts/api-view?app=my-app')
+        response = self.client.get('/alert-api/view?app=my-app')
 
         assert response.status_code == 200
         data = response.json()
