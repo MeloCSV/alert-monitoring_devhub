@@ -172,7 +172,7 @@ class TestAlertServiceDelegatingMethods:
         """
         Given blackouts where some match the solution
         When get_active_blackouts is called with a solution
-        Then should return only matching blackouts and persist all to DB
+        Then should return only matching blackouts without persisting
         """
         matching = Blackout(id='1', matchers=[BlackoutMatcher(name='namespace', value='my-app', is_regex=False, is_equal=True)])
         non_matching = Blackout(id='2', matchers=[BlackoutMatcher(name='namespace', value='other-app', is_regex=False, is_equal=True)])
@@ -182,13 +182,13 @@ class TestAlertServiceDelegatingMethods:
 
         assert len(result) == 1
         assert result[0].id == '1'
-        service.blackout_repository.upsert_batch.assert_called_once_with([matching, non_matching])
+        service.blackout_repository.upsert_batch.assert_not_called()
 
     def test_get_active_blackouts_without_solution_returns_all(self, service):
         """
         Given blackouts
         When get_active_blackouts is called without solution
-        Then should return all blackouts and persist them to DB
+        Then should return all blackouts without persisting
         """
         blackouts = [
             Blackout(id='1', matchers=[]),
@@ -199,34 +199,34 @@ class TestAlertServiceDelegatingMethods:
         result = service.get_active_blackouts()
 
         assert len(result) == 2
+        service.blackout_repository.upsert_batch.assert_not_called()
+
+    def test_sync_blackouts_persists_and_returns_count(self, service):
+        """
+        Given blackouts from AlertManager
+        When sync_blackouts is called
+        Then should persist them via upsert_batch and return the count
+        """
+        blackouts = [Blackout(id='1', matchers=[]), Blackout(id='2', matchers=[])]
+        service.alertmanager_adapter.fetch_active_blackouts.return_value = blackouts
+
+        count = service.sync_blackouts()
+
+        assert count == 2
         service.blackout_repository.upsert_batch.assert_called_once_with(blackouts)
 
-    def test_get_active_blackouts_empty_does_not_call_upsert(self, service):
+    def test_sync_blackouts_empty_does_not_call_upsert(self, service):
         """
         Given no blackouts from AlertManager
-        When get_active_blackouts is called
+        When sync_blackouts is called
         Then upsert_batch should NOT be called
         """
         service.alertmanager_adapter.fetch_active_blackouts.return_value = []
 
-        result = service.get_active_blackouts()
+        count = service.sync_blackouts()
 
-        assert result == []
+        assert count == 0
         service.blackout_repository.upsert_batch.assert_not_called()
-
-    def test_get_active_blackouts_upsert_exception_is_swallowed(self, service):
-        """
-        Given upsert_batch raises an exception
-        When get_active_blackouts is called
-        Then the exception should not propagate and blackouts are still returned
-        """
-        blackouts = [Blackout(id='1', matchers=[])]
-        service.alertmanager_adapter.fetch_active_blackouts.return_value = blackouts
-        service.blackout_repository.upsert_batch.side_effect = Exception("DB error")
-
-        result = service.get_active_blackouts()
-
-        assert len(result) == 1
 
     def test_get_api_solution_view_delegates_to_use_case(self, service, mocker):
         expected = ApiSolutionView(app='my-app', default_alerts=[], adhoc_alerts=[], api_microservice_map={}, channels=[])

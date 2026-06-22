@@ -203,14 +203,17 @@ class AlertService(AlertServicePort):
                     return True
         return False
 
+    def sync_blackouts(self) -> int:
+        self.logger.info('sync_blackouts')
+        blackouts = self.alertmanager_adapter.fetch_active_blackouts()
+        if blackouts:
+            self.blackout_repository.upsert_batch(blackouts)
+        self.logger.info(f'sync_blackouts: {len(blackouts)} silencios persistidos')
+        return len(blackouts)
+
     def get_active_blackouts(self, solution: Optional[str] = None) -> List[Blackout]:
         self.logger.info(f'get_active_blackouts solution={solution}')
         blackouts = self.alertmanager_adapter.fetch_active_blackouts()
-        if blackouts:
-            try:
-                self.blackout_repository.upsert_batch(blackouts)
-            except Exception as exc:
-                self.logger.warning(f"No se pudieron persistir los silencios: {exc}")
         if solution:
             blackouts = [b for b in blackouts if self._blackout_matches_solution(b, solution)]
         return blackouts

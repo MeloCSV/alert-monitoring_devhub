@@ -23,6 +23,10 @@ class AlertServicePort(ABC):
         pass
 
     @abstractmethod
+    def sync_blackouts(self) -> int:
+        pass
+
+    @abstractmethod
     def get_active_blackouts(self, solution: Optional[str] = None) -> List[Blackout]:
         pass
 

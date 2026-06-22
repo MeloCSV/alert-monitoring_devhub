@@ -98,12 +98,13 @@ def _execute_sync(
     finally:
         clean_session_context(token=token)
 
-    executor = ThreadPoolExecutor(max_workers=3)
+    executor = ThreadPoolExecutor(max_workers=4)
     try:
         futures: Dict[str, Future] = {
             "alerts_prometheus": executor.submit(_run_isolated, alert_service.sync_prometheus_alerts),
             "alerts_elastic": executor.submit(_run_isolated, alert_service.sync_elastic_alerts),
             "alert_api": executor.submit(_run_isolated, alert_api_service.sync_alert_apis),
+            "blackouts": executor.submit(_run_isolated, alert_service.sync_blackouts),
         }
         for name, future in futures.items():
             try:
@@ -115,7 +116,7 @@ def _execute_sync(
     finally:
         executor.shutdown(wait=False, cancel_futures=True)
 
-    for op in ["alerts_prometheus", "alerts_elastic", "alert_api"]:
+    for op in ["alerts_prometheus", "alerts_elastic", "alert_api", "blackouts"]:
         if "error" in results.get(op, {}):
             _sync_errors.add(1, {"operation": op})
 
