@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
 
 from alert_monitoring.api.domain.models.blackout import Blackout
 
@@ -7,7 +7,7 @@ from alert_monitoring.api.domain.models.blackout import Blackout
 class BlackoutRepositoryPort(ABC):
 
     @abstractmethod
-    def upsert_batch(self, blackouts: List[Blackout]) -> None:
+    def upsert_batch(self, blackouts: List[Blackout], catalog_app_names: Optional[List[str]] = None) -> None:
         pass
 
     @abstractmethod

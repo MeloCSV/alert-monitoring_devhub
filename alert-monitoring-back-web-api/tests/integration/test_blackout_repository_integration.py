@@ -77,17 +77,41 @@ class TestBlackoutRepositoryIntegration:
         assert len(row.matchers) == 2
         assert row.matchers[0]["name"] == "namespace"
 
-    def test_upsert_batch_extracts_app_name_from_namespace_matcher(self, repo, db_session):
-        """app_name se extrae automáticamente del matcher namespace."""
+    def test_upsert_batch_extracts_app_name_matching_catalog_exactly(self, repo, db_session):
+        """app_name se asigna cuando el matcher coincide exactamente con una app del catálogo."""
         blackout = _make_blackout(
             "id-app",
             matchers=[BlackoutMatcher(name="namespace", value="mi-servicio", is_regex=False, is_equal=True)],
         )
 
-        repo.upsert_batch([blackout])
+        repo.upsert_batch([blackout], catalog_app_names=["mi-servicio"])
 
         row = db_session.query(BlackoutDB).filter_by(alertmanager_id="id-app").first()
         assert row.app_name == "mi-servicio"
+
+    def test_upsert_batch_extracts_app_name_matching_catalog_prefix(self, repo, db_session):
+        """app_name se asigna cuando el matcher es la app del catálogo con un sufijo (p.ej. '-back')."""
+        blackout = _make_blackout(
+            "id-app-prefix",
+            matchers=[BlackoutMatcher(name="namespace", value="reservas-back", is_regex=False, is_equal=True)],
+        )
+
+        repo.upsert_batch([blackout], catalog_app_names=["reservas"])
+
+        row = db_session.query(BlackoutDB).filter_by(alertmanager_id="id-app-prefix").first()
+        assert row.app_name == "reservas"
+
+    def test_upsert_batch_app_name_null_when_no_catalog_match(self, repo, db_session):
+        """app_name queda NULL si el valor del matcher no coincide con ninguna app del catálogo."""
+        blackout = _make_blackout(
+            "id-app-nomatch",
+            matchers=[BlackoutMatcher(name="namespace", value="algo-desconocido", is_regex=False, is_equal=True)],
+        )
+
+        repo.upsert_batch([blackout], catalog_app_names=["reservas", "mi-servicio"])
+
+        row = db_session.query(BlackoutDB).filter_by(alertmanager_id="id-app-nomatch").first()
+        assert row.app_name is None
 
     def test_upsert_batch_empty_list_does_nothing(self, repo, db_session):
         """upsert_batch con lista vacía no inserta ninguna fila."""

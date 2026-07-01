@@ -209,11 +209,14 @@ class TestAlertServiceDelegatingMethods:
         """
         blackouts = [Blackout(id='1', matchers=[]), Blackout(id='2', matchers=[])]
         service.alertmanager_adapter.fetch_active_blackouts.return_value = blackouts
+        service.catalog_app_repository.get_all.return_value = [
+            CatalogApp(object_id='1', name='reservas'),
+        ]
 
         count = service.sync_blackouts()
 
         assert count == 2
-        service.blackout_repository.upsert_batch.assert_called_once_with(blackouts)
+        service.blackout_repository.upsert_batch.assert_called_once_with(blackouts, ['reservas'])
 
     def test_sync_blackouts_empty_does_not_call_upsert(self, service):
         """
