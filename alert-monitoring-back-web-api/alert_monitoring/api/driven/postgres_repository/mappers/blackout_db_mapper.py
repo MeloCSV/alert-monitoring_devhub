@@ -8,6 +8,7 @@ from alert_monitoring.api.driven.postgres_repository.models.blackout_model impor
 _APP_MATCHER_FIELDS = frozenset({
     'namespace', 'solucion', 'solution', 'exported_namespace',
     'backend_target_name', 'deployment', 'replicaset', 'cronjob', 'pod',
+    'alertname',
 })
 
 
@@ -27,15 +28,26 @@ class BlackoutDBMapper:
         for matcher in blackout.matchers:
             if matcher.name not in _APP_MATCHER_FIELDS or not matcher.is_equal:
                 continue
-            value = matcher.value.lower()
+            value = self._normalize(matcher.value)
             for name in candidates:
-                lowered = re.escape(name.lower())
+                lowered = re.escape(self._normalize(name))
                 # el nombre de catálogo debe aparecer delimitado por separadores
                 # no alfanuméricos (o inicio/fin), tanto en valores exactos como
                 # en patrones regex tipo ".*reservas-back.*"
                 if re.search(rf"(?<![a-z0-9]){lowered}(?![a-z0-9])", value):
                     return name
         return None
+
+    # solo letra minúscula -> mayúscula cuenta como límite; un dígito antes de una
+    # mayúscula ("P1Secos") no separa, porque suele ser parte del mismo código de app
+    _CAMEL_BOUNDARY = re.compile(r'(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])')
+
+    @classmethod
+    def _normalize(cls, value: str) -> str:
+        # inserta un separador en los límites camelCase antes de pasar a minúsculas,
+        # tanto en transiciones simples ("p1secosAlert" -> "p1secos-alert") como en
+        # acrónimos seguidos de palabra ("CloudSQLNotAvailable" -> "cloud-sql-not-available")
+        return cls._CAMEL_BOUNDARY.sub('-', value).lower()
 
     def to_db(self, blackout: Blackout, catalog_app_names: Optional[List[str]] = None) -> BlackoutDB:
         return BlackoutDB(
