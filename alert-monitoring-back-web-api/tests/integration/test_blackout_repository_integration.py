@@ -41,7 +41,7 @@ class TestBlackoutRepositoryIntegration:
         """upsert_batch inserta silencios nuevos en la base de datos."""
         blackouts = [_make_blackout("id-1"), _make_blackout("id-2")]
 
-        repo.upsert_batch(blackouts)
+        repo.upsert_batch(blackouts, catalog_app_names=["my-app"])
 
         rows = db_session.query(BlackoutDB).all()
         assert len(rows) == 2
@@ -49,8 +49,8 @@ class TestBlackoutRepositoryIntegration:
 
     def test_upsert_batch_updates_existing_blackout(self, repo, db_session):
         """upsert_batch actualiza un silencio existente sin duplicarlo."""
-        repo.upsert_batch([_make_blackout("id-1", comment="original")])
-        repo.upsert_batch([_make_blackout("id-1", comment="updated")])
+        repo.upsert_batch([_make_blackout("id-1", comment="original")], catalog_app_names=["my-app"])
+        repo.upsert_batch([_make_blackout("id-1", comment="updated")], catalog_app_names=["my-app"])
 
         rows = db_session.query(BlackoutDB).all()
         assert len(rows) == 1
@@ -64,7 +64,7 @@ class TestBlackoutRepositoryIntegration:
         ]
         blackout = _make_blackout("id-full", matchers=matchers, state="active", source="am-prod", comment="full fields")
 
-        repo.upsert_batch([blackout])
+        repo.upsert_batch([blackout], catalog_app_names=["my-app"])
 
         row = db_session.query(BlackoutDB).filter_by(alertmanager_id="id-full").first()
         assert row is not None
@@ -181,18 +181,6 @@ class TestBlackoutRepositoryIntegration:
         row = db_session.query(BlackoutDB).filter_by(alertmanager_id="id-app-any-field").first()
         assert row.app_names == ["sddr"]
 
-    def test_upsert_batch_app_names_empty_when_no_catalog_match(self, repo, db_session):
-        """app_names queda vacío si el valor del matcher no coincide con ninguna app del catálogo."""
-        blackout = _make_blackout(
-            "id-app-nomatch",
-            matchers=[BlackoutMatcher(name="namespace", value="algo-desconocido", is_regex=False, is_equal=True)],
-        )
-
-        repo.upsert_batch([blackout], catalog_app_names=["reservas", "mi-servicio"])
-
-        row = db_session.query(BlackoutDB).filter_by(alertmanager_id="id-app-nomatch").first()
-        assert row.app_names == []
-
     def test_upsert_batch_empty_list_does_nothing(self, repo, db_session):
         """upsert_batch con lista vacía no inserta ninguna fila."""
         repo.upsert_batch([])
@@ -202,24 +190,51 @@ class TestBlackoutRepositoryIntegration:
 
     def test_upsert_batch_mixed_insert_and_update(self, repo, db_session):
         """upsert_batch maneja correctamente una mezcla de inserts y updates."""
-        repo.upsert_batch([_make_blackout("id-existing", comment="old")])
+        repo.upsert_batch([_make_blackout("id-existing", comment="old")], catalog_app_names=["my-app"])
 
         repo.upsert_batch([
             _make_blackout("id-existing", comment="new"),
             _make_blackout("id-new"),
-        ])
+        ], catalog_app_names=["my-app"])
 
         rows = db_session.query(BlackoutDB).all()
         assert len(rows) == 2
         existing = next(r for r in rows if r.alertmanager_id == "id-existing")
         assert existing.comment == "new"
 
+    def test_upsert_batch_does_not_persist_blackout_without_catalog_match(self, repo, db_session):
+        """Un silencio cuyos matchers no coinciden con ninguna app del catálogo no se guarda:
+        los silencios se consultan por aplicación y sin app_name no tiene sentido almacenarlo."""
+        blackout = _make_blackout(
+            "id-no-app",
+            matchers=[BlackoutMatcher(name="namespace", value="algo-desconocido", is_regex=False, is_equal=True)],
+        )
+
+        repo.upsert_batch([blackout], catalog_app_names=["reservas", "mi-servicio"])
+
+        rows = db_session.query(BlackoutDB).all()
+        assert rows == []
+
+    def test_upsert_batch_deletes_existing_blackout_that_stops_matching(self, repo, db_session):
+        """Si un silencio ya guardado deja de matchear con el catálogo (p.ej. la app se elimina),
+        se borra en el siguiente sync en vez de dejarlo huérfano."""
+        blackout = _make_blackout(
+            "id-was-app",
+            matchers=[BlackoutMatcher(name="namespace", value="reservas", is_regex=False, is_equal=True)],
+        )
+        repo.upsert_batch([blackout], catalog_app_names=["reservas"])
+        assert db_session.query(BlackoutDB).filter_by(alertmanager_id="id-was-app").first() is not None
+
+        repo.upsert_batch([blackout], catalog_app_names=["otra-app"])
+
+        assert db_session.query(BlackoutDB).filter_by(alertmanager_id="id-was-app").first() is None
+
     def test_get_all_returns_active_blackouts(self, repo):
         """get_all devuelve solo los silencios con state='active'."""
         repo.upsert_batch([
             _make_blackout("id-active", state="active"),
             _make_blackout("id-expired", state="expired"),
-        ])
+        ], catalog_app_names=["my-app"])
 
         result = repo.get_all()
 
@@ -228,7 +243,7 @@ class TestBlackoutRepositoryIntegration:
 
     def test_get_all_maps_domain_fields(self, repo):
         """get_all devuelve objetos Blackout con todos los campos correctos."""
-        repo.upsert_batch([_make_blackout("id-full")])
+        repo.upsert_batch([_make_blackout("id-full")], catalog_app_names=["my-app"])
 
         result = repo.get_all()
 

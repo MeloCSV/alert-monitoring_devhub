@@ -25,6 +25,7 @@ class BlackoutRepositoryAdapter(BlackoutRepositoryPort):
 
     def upsert_batch(self, blackouts: List[Blackout], catalog_app_names: Optional[List[str]] = None) -> None:
         self.logger.info(f"Persistiendo {len(blackouts)} silencios")
+        skipped = 0
         for blackout in blackouts:
             db_obj = self.blackout_db_mapper.to_db(blackout, catalog_app_names)
             existing = (
@@ -32,6 +33,14 @@ class BlackoutRepositoryAdapter(BlackoutRepositoryPort):
                 .filter(BlackoutDB.alertmanager_id == db_obj.alertmanager_id)
                 .first()
             )
+            if not db_obj.app_names:
+                # los silencios se consultan por aplicación: si no matchea con
+                # ninguna del catálogo no tiene sentido guardarlo (ni mantener
+                # una fila antigua que ya haya dejado de matchear)
+                if existing:
+                    self.sqlalchemy_repository.delete(existing)
+                skipped += 1
+                continue
             if existing:
                 existing.matchers = db_obj.matchers
                 existing.starts_at = db_obj.starts_at
@@ -44,6 +53,8 @@ class BlackoutRepositoryAdapter(BlackoutRepositoryPort):
             else:
                 self.sqlalchemy_repository.add(db_obj)
         self.sqlalchemy_repository.commit()
+        if skipped:
+            self.logger.info(f"Silencios omitidos por no matchear con ninguna app del catálogo: {skipped}")
 
     def get_all(self) -> List[Blackout]:
         self.logger.info("Consultando silencios activos")
