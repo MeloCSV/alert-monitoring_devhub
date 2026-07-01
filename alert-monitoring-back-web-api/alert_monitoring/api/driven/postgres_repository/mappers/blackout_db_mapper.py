@@ -22,23 +22,30 @@ class BlackoutDBMapper:
         return datetime.fromisoformat(value.replace('Z', '+00:00'))
 
     def _extract_app_names(self, blackout: Blackout, catalog_app_names: List[str]) -> List[str]:
-        # nombres más largos primero para preferir el match más específico por matcher
-        # (p.ej. "reservas-hoteles" antes que "reservas")
+        # nombres más largos primero para preferir el match más específico
+        # (p.ej. "reservas-hoteles" antes que "reservas") cuando se solapan
         candidates = sorted(catalog_app_names, key=len, reverse=True)
         found: List[str] = []
         for matcher in blackout.matchers:
             if matcher.name not in _APP_MATCHER_FIELDS or not matcher.is_equal:
                 continue
             value = self._normalize(matcher.value)
+            # un mismo matcher puede listar varias apps distintas (p.ej. una regex
+            # con alternancia "organigrama.*|labmng.*"), así que hay que detectar
+            # todas las que aparezcan, no solo la primera
+            consumed_spans: List[tuple[int, int]] = []
             for name in candidates:
                 lowered = re.escape(self._normalize(name))
                 # el nombre de catálogo debe aparecer delimitado por separadores
                 # no alfanuméricos (o inicio/fin), tanto en valores exactos como
                 # en patrones regex tipo ".*reservas-back.*"
-                if re.search(rf"(?<![a-z0-9]){lowered}(?![a-z0-9])", value):
+                for match in re.finditer(rf"(?<![a-z0-9]){lowered}(?![a-z0-9])", value):
+                    start, end = match.span()
+                    if any(start < e and s < end for s, e in consumed_spans):
+                        continue  # ya cubierto por un nombre de catálogo más específico
+                    consumed_spans.append((start, end))
                     if name not in found:
                         found.append(name)
-                    break
         return found
 
     # solo letra minúscula -> mayúscula cuenta como límite; un dígito antes de una
