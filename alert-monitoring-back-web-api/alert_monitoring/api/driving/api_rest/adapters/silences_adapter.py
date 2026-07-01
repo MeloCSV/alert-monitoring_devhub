@@ -45,7 +45,6 @@ def get_silences(
             matchers=[BlackoutMatcherResponse(**m.model_dump()) for m in b.matchers],
             starts_at=b.starts_at,
             ends_at=b.ends_at,
-            created_by=b.created_by,
             comment=b.comment,
             source=b.source,
         )
