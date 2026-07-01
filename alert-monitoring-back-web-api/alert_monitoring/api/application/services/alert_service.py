@@ -103,15 +103,19 @@ class AlertService(AlertServicePort):
         return build_catalog_lookup(self.catalog_app_repository)
 
     def _normalize_solutions(self, alerts: List[Alert], catalog_lookup: Dict[str, str]) -> List[Alert]:
+        # las alertas se consultan por aplicación: sin una solución reconocida
+        # en el catálogo no tiene sentido guardarlas
+        normalized: List[Alert] = []
         for alert in alerts:
             if not alert.solution:
                 continue
             canonical = catalog_lookup.get(alert.solution.lower())
-            if canonical:
-                alert.solution = canonical
-            else:
+            if not canonical:
                 self.logger.warning(f"solution '{alert.solution}' not found in catalog")
-        return alerts
+                continue
+            alert.solution = canonical
+            normalized.append(alert)
+        return normalized
 
     def _upsert_default_alerts(self, default_rules) -> None:
         if not default_rules:
@@ -156,7 +160,7 @@ class AlertService(AlertServicePort):
         default_raw_rules = [r for r in rules if is_default_rule(r)]
         adhoc_alerts = [a for a in self.prometheus_mapper.to_domain(rules) if a.alert_type != "Por Defecto"]
         catalog_lookup = self._catalog_lookup_cache.get_or_compute(self._build_catalog_lookup)
-        self._normalize_solutions(adhoc_alerts, catalog_lookup)
+        adhoc_alerts = self._normalize_solutions(adhoc_alerts, catalog_lookup)
 
         self.alert_repository.delete_by_source_tool("Prometheus")
         self.save_use_case.execute(adhoc_alerts)
@@ -170,7 +174,7 @@ class AlertService(AlertServicePort):
         rules = self.elastic_adapter.parse_rules(raw_rules)
         alerts = self.elastic_mapper.to_domain(rules)
         catalog_lookup = self._catalog_lookup_cache.get_or_compute(self._build_catalog_lookup)
-        self._normalize_solutions(alerts, catalog_lookup)
+        alerts = self._normalize_solutions(alerts, catalog_lookup)
         self.alert_repository.delete_by_source_tool("Elastic")
         self.save_use_case.execute(alerts)
         return len(alerts)
