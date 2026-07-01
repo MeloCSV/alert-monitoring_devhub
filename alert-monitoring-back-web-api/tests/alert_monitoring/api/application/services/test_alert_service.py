@@ -259,8 +259,9 @@ class TestAlertServiceDelegatingMethods:
     def test_normalize_solutions_maps_to_canonical_name(self, service):
         catalog = {'my-app': 'My-App'}
         alert = _make_alert(solution='my-app')
-        service._normalize_solutions([alert], catalog)
+        result = service._normalize_solutions([alert], catalog)
         assert alert.solution == 'My-App'
+        assert result == [alert]
 
     def test_normalize_solutions_warns_when_unknown(self, service):
         catalog = {}
@@ -268,11 +269,25 @@ class TestAlertServiceDelegatingMethods:
         service._normalize_solutions([alert], catalog)
         service.logger.warning.assert_called_once()
 
+    def test_normalize_solutions_filters_out_alerts_with_unknown_solution(self, service):
+        """Una alerta cuya solución no está en el catálogo no se guarda."""
+        catalog = {}
+        alert = _make_alert(solution='unknown-app')
+        result = service._normalize_solutions([alert], catalog)
+        assert result == []
+
     def test_normalize_solutions_skips_alerts_without_solution(self, service):
         catalog = {}
         alert = _make_alert(solution=None)
         service._normalize_solutions([alert], catalog)
         service.logger.warning.assert_not_called()
+
+    def test_normalize_solutions_filters_out_alerts_without_solution(self, service):
+        """Una alerta sin solución no se guarda."""
+        catalog = {}
+        alert = _make_alert(solution=None)
+        result = service._normalize_solutions([alert], catalog)
+        assert result == []
 
     def test_sync_prometheus_alerts_deletes_and_saves(self, service):
         rules = [
@@ -286,6 +301,19 @@ class TestAlertServiceDelegatingMethods:
 
         assert count == 1
         service.alert_repository.delete_by_source_tool.assert_called_once_with('Prometheus')
+
+    def test_sync_prometheus_alerts_does_not_save_alert_with_unrecognized_solution(self, service):
+        """Si la solución inferida de la regla no está en el catálogo, la alerta no se guarda."""
+        rules = [
+            PrometheusRule(alert='MyAlert', expr='', labels={'severity': 'warning'}, annotations={}, group_name='my-app.rules'),
+        ]
+        service.prometheus_adapter.fetch_rules.return_value = rules
+        service.catalog_app_repository.get_all.return_value = []  # catálogo vacío: "my-app" no se reconoce
+        service.default_alert_repository.upsert_batch = MagicMock()
+
+        service.sync_prometheus_alerts()
+
+        service.alert_repository.save_all.assert_called_once_with([])
 
     def test_sync_elastic_alerts_deletes_and_saves(self, service, mocker):
         service.kibana_adapter.fetch_rules.return_value = []
