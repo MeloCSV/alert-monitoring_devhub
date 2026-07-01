@@ -18,6 +18,8 @@ class ElasticAdapter:
     def parse_rules(self, items: List[dict]) -> List[ElasticRule]:
         rules: List[ElasticRule] = []
         for item in items:
+            if not item.get("enabled", False):
+                continue
             try:
                 rule = self._parse_rule(item)
                 if rule:
