@@ -101,6 +101,42 @@ class TestBlackoutRepositoryIntegration:
         row = db_session.query(BlackoutDB).filter_by(alertmanager_id="id-app-prefix").first()
         assert row.app_name == "reservas"
 
+    def test_upsert_batch_extracts_app_name_from_regex_matcher(self, repo, db_session):
+        """app_name se asigna aunque el matcher sea una regex de Alertmanager (p.ej. '.*reservas-back.*')."""
+        blackout = _make_blackout(
+            "id-app-regex",
+            matchers=[BlackoutMatcher(name="backend_target_name", value=".*reservas-back.*", is_regex=True, is_equal=True)],
+        )
+
+        repo.upsert_batch([blackout], catalog_app_names=["reservas"])
+
+        row = db_session.query(BlackoutDB).filter_by(alertmanager_id="id-app-regex").first()
+        assert row.app_name == "reservas"
+
+    def test_upsert_batch_extracts_app_name_from_alertname_camel_case(self, repo, db_session):
+        """app_name se asigna a partir del alertname aunque use camelCase (p.ej. 'P1SecosAlert')."""
+        blackout = _make_blackout(
+            "id-app-camel",
+            matchers=[BlackoutMatcher(name="alertname", value="P1SecosAlert", is_regex=False, is_equal=True)],
+        )
+
+        repo.upsert_batch([blackout], catalog_app_names=["p1secos"])
+
+        row = db_session.query(BlackoutDB).filter_by(alertmanager_id="id-app-camel").first()
+        assert row.app_name == "p1secos"
+
+    def test_upsert_batch_extracts_app_name_from_alertname_snake_case(self, repo, db_session):
+        """app_name se asigna a partir del alertname con snake_case (p.ej. 'p1secos_alert')."""
+        blackout = _make_blackout(
+            "id-app-snake",
+            matchers=[BlackoutMatcher(name="alertname", value="p1secos_alert", is_regex=False, is_equal=True)],
+        )
+
+        repo.upsert_batch([blackout], catalog_app_names=["p1secos"])
+
+        row = db_session.query(BlackoutDB).filter_by(alertmanager_id="id-app-snake").first()
+        assert row.app_name == "p1secos"
+
     def test_upsert_batch_app_name_null_when_no_catalog_match(self, repo, db_session):
         """app_name queda NULL si el valor del matcher no coincide con ninguna app del catálogo."""
         blackout = _make_blackout(
