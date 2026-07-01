@@ -5,12 +5,6 @@ from typing import List, Optional
 from alert_monitoring.api.domain.models.blackout import Blackout, BlackoutMatcher
 from alert_monitoring.api.driven.postgres_repository.models.blackout_model import BlackoutDB
 
-_APP_MATCHER_FIELDS = frozenset({
-    'namespace', 'solucion', 'solution', 'exported_namespace',
-    'backend_target_name', 'deployment', 'replicaset', 'cronjob', 'pod',
-    'alertname',
-})
-
 
 class BlackoutDBMapper:
 
@@ -27,7 +21,7 @@ class BlackoutDBMapper:
         candidates = sorted(catalog_app_names, key=len, reverse=True)
         found: List[str] = []
         for matcher in blackout.matchers:
-            if matcher.name not in _APP_MATCHER_FIELDS or not matcher.is_equal:
+            if not matcher.is_equal:
                 continue
             value = self._normalize(matcher.value)
             # un mismo matcher puede listar varias apps distintas (p.ej. una regex
