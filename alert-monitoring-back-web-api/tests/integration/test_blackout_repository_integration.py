@@ -152,6 +152,18 @@ class TestBlackoutRepositoryIntegration:
         row = db_session.query(BlackoutDB).filter_by(alertmanager_id="id-app-multi").first()
         assert row.app_names == ["reservas", "hoteles"]
 
+    def test_upsert_batch_extracts_multiple_app_names_from_single_regex_alternation(self, repo, db_session):
+        """app_names incluye varias apps cuando UN SOLO matcher regex las lista por alternancia (p.ej. 'a|b')."""
+        blackout = _make_blackout(
+            "id-app-alternation",
+            matchers=[BlackoutMatcher(name="alertname", value=".*organigrama.*|.*labmng.*", is_regex=True, is_equal=True)],
+        )
+
+        repo.upsert_batch([blackout], catalog_app_names=["organigrama", "labmng"])
+
+        row = db_session.query(BlackoutDB).filter_by(alertmanager_id="id-app-alternation").first()
+        assert row.app_names == ["organigrama", "labmng"]
+
     def test_upsert_batch_app_names_empty_when_no_catalog_match(self, repo, db_session):
         """app_names queda vacío si el valor del matcher no coincide con ninguna app del catálogo."""
         blackout = _make_blackout(
