@@ -8,7 +8,7 @@ from alert_monitoring.api.driven.postgres_repository.models.blackout_model impor
 _APP_MATCHER_FIELDS = frozenset({
     'namespace', 'solucion', 'solution', 'exported_namespace',
     'backend_target_name', 'deployment', 'replicaset', 'cronjob', 'pod',
-    'alertname',
+    'alertname', 'application',
 })
 
 

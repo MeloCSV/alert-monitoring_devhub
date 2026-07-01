@@ -164,6 +164,22 @@ class TestBlackoutRepositoryIntegration:
         row = db_session.query(BlackoutDB).filter_by(alertmanager_id="id-app-alternation").first()
         assert row.app_names == ["organigrama", "labmng"]
 
+    def test_upsert_batch_extracts_app_name_from_application_field(self, repo, db_session):
+        """app_names se calcula a partir del campo 'application' del matcher."""
+        blackout = _make_blackout(
+            "id-app-application-field",
+            matchers=[
+                BlackoutMatcher(name="origin", value="elastic", is_regex=False, is_equal=True),
+                BlackoutMatcher(name="application", value="sddr", is_regex=False, is_equal=True),
+                BlackoutMatcher(name="severity", value="critical", is_regex=False, is_equal=True),
+            ],
+        )
+
+        repo.upsert_batch([blackout], catalog_app_names=["sddr"])
+
+        row = db_session.query(BlackoutDB).filter_by(alertmanager_id="id-app-application-field").first()
+        assert row.app_names == ["sddr"]
+
     def test_upsert_batch_app_names_empty_when_no_catalog_match(self, repo, db_session):
         """app_names queda vacío si el valor del matcher no coincide con ninguna app del catálogo."""
         blackout = _make_blackout(
