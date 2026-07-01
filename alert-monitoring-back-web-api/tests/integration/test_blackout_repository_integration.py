@@ -101,6 +101,18 @@ class TestBlackoutRepositoryIntegration:
         row = db_session.query(BlackoutDB).filter_by(alertmanager_id="id-app-prefix").first()
         assert row.app_name == "reservas"
 
+    def test_upsert_batch_extracts_app_name_from_regex_matcher(self, repo, db_session):
+        """app_name se asigna aunque el matcher sea una regex de Alertmanager (p.ej. '.*reservas-back.*')."""
+        blackout = _make_blackout(
+            "id-app-regex",
+            matchers=[BlackoutMatcher(name="backend_target_name", value=".*reservas-back.*", is_regex=True, is_equal=True)],
+        )
+
+        repo.upsert_batch([blackout], catalog_app_names=["reservas"])
+
+        row = db_session.query(BlackoutDB).filter_by(alertmanager_id="id-app-regex").first()
+        assert row.app_name == "reservas"
+
     def test_upsert_batch_app_name_null_when_no_catalog_match(self, repo, db_session):
         """app_name queda NULL si el valor del matcher no coincide con ninguna app del catálogo."""
         blackout = _make_blackout(

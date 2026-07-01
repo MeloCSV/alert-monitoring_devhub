@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -24,12 +25,15 @@ class BlackoutDBMapper:
         # (p.ej. "reservas-hoteles" antes que "reservas")
         candidates = sorted(catalog_app_names, key=len, reverse=True)
         for matcher in blackout.matchers:
-            if matcher.name not in _APP_MATCHER_FIELDS or not matcher.is_equal or matcher.is_regex:
+            if matcher.name not in _APP_MATCHER_FIELDS or not matcher.is_equal:
                 continue
             value = matcher.value.lower()
             for name in candidates:
-                lowered = name.lower()
-                if value == lowered or value.startswith(f"{lowered}-") or value.startswith(f"{lowered}_"):
+                lowered = re.escape(name.lower())
+                # el nombre de catálogo debe aparecer delimitado por separadores
+                # no alfanuméricos (o inicio/fin), tanto en valores exactos como
+                # en patrones regex tipo ".*reservas-back.*"
+                if re.search(rf"(?<![a-z0-9]){lowered}(?![a-z0-9])", value):
                     return name
         return None
 
