@@ -19,5 +19,5 @@ class BlackoutDB(SQLModel, table=True):
     comment: Optional[str] = None
     state: str = Field(default="active")
     source: Optional[str] = None
-    app_name: Optional[str] = None
+    app_names: List[str] = Field(default=[], sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=datetime.utcnow)
