@@ -47,6 +47,11 @@ class TestElasticMapperMapRule:
         alert = mapper._map_rule(rule)
         assert alert.name == 'My Elastic Alert'
 
+    def test_maps_name_from_alertname_label_when_present(self, mapper):
+        rule = _make_rule(name='My Elastic Alert', labels={'alertname': 'sddr_EntidadGestoraError'})
+        alert = mapper._map_rule(rule)
+        assert alert.name == 'sddr_EntidadGestoraError'
+
     def test_uses_description_when_provided(self, mapper):
         rule = _make_rule(description='Custom description')
         alert = mapper._map_rule(rule)
