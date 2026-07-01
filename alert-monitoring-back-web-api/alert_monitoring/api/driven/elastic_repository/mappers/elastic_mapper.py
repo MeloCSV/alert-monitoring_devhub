@@ -20,7 +20,7 @@ class ElasticMapper:
     def _map_rule(self, rule: ElasticRule) -> Alert:
         labels = rule.labels
         return Alert(
-            name=rule.name,
+            name=labels.get("alertname") or rule.name,
             description=rule.description or "Sin descripción",
             source_tool="Elastic",
             severity=labels.get("severity") or "unknown",
