@@ -207,7 +207,8 @@ class AlertService(AlertServicePort):
         self.logger.info('sync_blackouts')
         blackouts = self.alertmanager_adapter.fetch_active_blackouts()
         if blackouts:
-            self.blackout_repository.upsert_batch(blackouts)
+            catalog_app_names = [app.name for app in self.catalog_app_repository.get_all()]
+            self.blackout_repository.upsert_batch(blackouts, catalog_app_names)
         self.logger.info(f'sync_blackouts: {len(blackouts)} silencios persistidos')
         return len(blackouts)
 

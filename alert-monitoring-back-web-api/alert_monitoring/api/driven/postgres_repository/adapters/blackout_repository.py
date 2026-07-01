@@ -23,10 +23,10 @@ class BlackoutRepositoryAdapter(BlackoutRepositoryPort):
         self.blackout_db_mapper = blackout_db_mapper
         self.logger = logger
 
-    def upsert_batch(self, blackouts: List[Blackout]) -> None:
+    def upsert_batch(self, blackouts: List[Blackout], catalog_app_names: Optional[List[str]] = None) -> None:
         self.logger.info(f"Persistiendo {len(blackouts)} silencios")
         for blackout in blackouts:
-            db_obj = self.blackout_db_mapper.to_db(blackout)
+            db_obj = self.blackout_db_mapper.to_db(blackout, catalog_app_names)
             existing = (
                 self.sqlalchemy_repository.query(BlackoutDB)
                 .filter(BlackoutDB.alertmanager_id == db_obj.alertmanager_id)

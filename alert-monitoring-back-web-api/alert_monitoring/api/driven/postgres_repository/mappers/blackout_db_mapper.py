@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 
 from alert_monitoring.api.domain.models.blackout import Blackout, BlackoutMatcher
 from alert_monitoring.api.driven.postgres_repository.models.blackout_model import BlackoutDB
@@ -19,13 +19,21 @@ class BlackoutDBMapper:
             return value
         return datetime.fromisoformat(value.replace('Z', '+00:00'))
 
-    def _extract_app_name(self, blackout: Blackout) -> str | None:
+    def _extract_app_name(self, blackout: Blackout, catalog_app_names: List[str]) -> Optional[str]:
+        # nombres más largos primero para preferir el match más específico
+        # (p.ej. "reservas-hoteles" antes que "reservas")
+        candidates = sorted(catalog_app_names, key=len, reverse=True)
         for matcher in blackout.matchers:
-            if matcher.name in _APP_MATCHER_FIELDS and matcher.is_equal and not matcher.is_regex:
-                return matcher.value
+            if matcher.name not in _APP_MATCHER_FIELDS or not matcher.is_equal or matcher.is_regex:
+                continue
+            value = matcher.value.lower()
+            for name in candidates:
+                lowered = name.lower()
+                if value == lowered or value.startswith(f"{lowered}-") or value.startswith(f"{lowered}_"):
+                    return name
         return None
 
-    def to_db(self, blackout: Blackout) -> BlackoutDB:
+    def to_db(self, blackout: Blackout, catalog_app_names: Optional[List[str]] = None) -> BlackoutDB:
         return BlackoutDB(
             alertmanager_id=blackout.id,
             matchers=[m.model_dump() for m in blackout.matchers],
@@ -35,7 +43,7 @@ class BlackoutDBMapper:
             comment=blackout.comment,
             state=blackout.state,
             source=blackout.source,
-            app_name=self._extract_app_name(blackout),
+            app_name=self._extract_app_name(blackout, catalog_app_names or []),
         )
 
     def to_domain(self, row: BlackoutDB) -> Blackout:
