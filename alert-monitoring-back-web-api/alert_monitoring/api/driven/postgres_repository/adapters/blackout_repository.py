@@ -40,7 +40,7 @@ class BlackoutRepositoryAdapter(BlackoutRepositoryPort):
                 existing.comment = db_obj.comment
                 existing.state = db_obj.state
                 existing.source = db_obj.source
-                existing.app_name = db_obj.app_name
+                existing.app_names = db_obj.app_names
             else:
                 self.sqlalchemy_repository.add(db_obj)
         self.sqlalchemy_repository.commit()

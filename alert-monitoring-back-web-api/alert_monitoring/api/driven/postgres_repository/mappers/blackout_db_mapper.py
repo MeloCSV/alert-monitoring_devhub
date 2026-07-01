@@ -21,10 +21,11 @@ class BlackoutDBMapper:
             return value
         return datetime.fromisoformat(value.replace('Z', '+00:00'))
 
-    def _extract_app_name(self, blackout: Blackout, catalog_app_names: List[str]) -> Optional[str]:
-        # nombres más largos primero para preferir el match más específico
+    def _extract_app_names(self, blackout: Blackout, catalog_app_names: List[str]) -> List[str]:
+        # nombres más largos primero para preferir el match más específico por matcher
         # (p.ej. "reservas-hoteles" antes que "reservas")
         candidates = sorted(catalog_app_names, key=len, reverse=True)
+        found: List[str] = []
         for matcher in blackout.matchers:
             if matcher.name not in _APP_MATCHER_FIELDS or not matcher.is_equal:
                 continue
@@ -35,8 +36,10 @@ class BlackoutDBMapper:
                 # no alfanuméricos (o inicio/fin), tanto en valores exactos como
                 # en patrones regex tipo ".*reservas-back.*"
                 if re.search(rf"(?<![a-z0-9]){lowered}(?![a-z0-9])", value):
-                    return name
-        return None
+                    if name not in found:
+                        found.append(name)
+                    break
+        return found
 
     # solo letra minúscula -> mayúscula cuenta como límite; un dígito antes de una
     # mayúscula ("P1Secos") no separa, porque suele ser parte del mismo código de app
@@ -59,7 +62,7 @@ class BlackoutDBMapper:
             comment=blackout.comment,
             state=blackout.state,
             source=blackout.source,
-            app_name=self._extract_app_name(blackout, catalog_app_names or []),
+            app_names=self._extract_app_names(blackout, catalog_app_names or []),
         )
 
     def to_domain(self, row: BlackoutDB) -> Blackout:
