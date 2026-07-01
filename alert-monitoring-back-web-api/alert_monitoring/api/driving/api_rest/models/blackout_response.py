@@ -15,6 +15,5 @@ class BlackoutResponse(BaseModel):
     matchers: List[BlackoutMatcherResponse]
     starts_at: Optional[str] = None
     ends_at: Optional[str] = None
-    created_by: Optional[str] = None
     comment: Optional[str] = None
     source: Optional[str] = None
