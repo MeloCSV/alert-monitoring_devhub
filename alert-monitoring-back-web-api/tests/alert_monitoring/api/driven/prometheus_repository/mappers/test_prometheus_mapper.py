@@ -225,3 +225,54 @@ class TestInferEnvironments:
         rule = _rule(labels={'environment': '{{ $labels.env }}'})
         result = mapper.to_domain([rule])
         assert result[0].environments == ['dev', 'itg', 'pre', 'pro']
+
+
+# ---------------------------------------------------------------------------
+# PrometheusMapper.to_adhoc_alerts
+# ---------------------------------------------------------------------------
+
+class TestToAdhocAlerts:
+    def test_excludes_default_rules(self, mapper):
+        result = mapper.to_adhoc_alerts([_default_rule(), _rule()])
+        assert len(result) == 1
+        assert result[0].alert_type == 'Ad-hoc'
+
+    def test_empty_when_only_default_rules(self, mapper):
+        result = mapper.to_adhoc_alerts([_default_rule()])
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
+# PrometheusMapper.to_default_alerts
+# ---------------------------------------------------------------------------
+
+class TestToDefaultAlerts:
+    def test_empty_list_for_no_rules(self, mapper):
+        assert mapper.to_default_alerts([]) == []
+
+    def test_no_default_alerts_when_only_adhoc_rules(self, mapper):
+        assert mapper.to_default_alerts([_rule()]) == []
+
+    def test_builds_default_alert_from_default_rule(self, mapper):
+        rule = _default_rule(
+            alert='Default_Status some label',
+            expr='namespace!~"excl-ns"',
+        )
+        rule.annotations = {'message': 'Service down'}
+        result = mapper.to_default_alerts([rule])
+
+        assert len(result) == 1
+        assert result[0].raw_name == 'Default_Status'
+        assert result[0].raw_description == 'Service down'
+        assert result[0].severity == 'warning'
+        assert result[0].excluded_namespaces == ['excl-ns']
+
+    def test_groups_multiple_instances_by_raw_name(self, mapper):
+        rules = [
+            _default_rule(alert='Default_Status instance-a', expr='namespace!~"ns-a"'),
+            _default_rule(alert='Default_Status instance-b', expr='namespace!~"ns-b"'),
+        ]
+        result = mapper.to_default_alerts(rules)
+
+        assert len(result) == 1
+        assert set(result[0].excluded_namespaces) == {'ns-a', 'ns-b'}

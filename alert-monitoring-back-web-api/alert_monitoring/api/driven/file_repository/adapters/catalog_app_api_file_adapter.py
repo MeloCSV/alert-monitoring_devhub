@@ -3,13 +3,15 @@ import logging
 from pathlib import Path
 from typing import List
 
+from alert_monitoring.api.application.ports.driven.catalog_app_api_source_port import CatalogAppApiSourcePort
+
 logger = logging.getLogger(__name__)
 
 # Resolves to alert-monitoring-back-web-api/resources/catalog_app_api.json
 _RESOURCES_PATH = Path(__file__).parents[5] / "resources" / "catalog_app_api.json"
 
 
-class CatalogAppApiFileAdapter:
+class CatalogAppApiFileAdapter(CatalogAppApiSourcePort):
 
     def fetch_entries(self) -> List[dict]:
         if not _RESOURCES_PATH.exists():

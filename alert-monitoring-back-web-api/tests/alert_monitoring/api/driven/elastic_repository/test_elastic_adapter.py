@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 from alert_monitoring.api.driven.elastic_repository.adapters.elastic_adapter import ElasticAdapter
 
 
@@ -42,3 +44,22 @@ class TestElasticAdapterParseRules:
         result = adapter.parse_rules(items)
         assert len(result) == 1
         assert result[0].name == 'Enabled Rule'
+
+
+class TestElasticAdapterFetchAlerts:
+    def test_orchestrates_kibana_fetch_parse_and_map(self, mocker):
+        raw_rules = [_make_item()]
+        kibana_adapter = MagicMock()
+        kibana_adapter.fetch_rules.return_value = raw_rules
+        mapper = MagicMock()
+        mapper.to_domain.return_value = ['mapped-alert']
+        adapter = ElasticAdapter(kibana_adapter=kibana_adapter, mapper=mapper)
+        parsed_rules = ['parsed-rule']
+        mocker.patch.object(adapter, 'parse_rules', return_value=parsed_rules)
+
+        result = adapter.fetch_alerts()
+
+        assert result == ['mapped-alert']
+        kibana_adapter.fetch_rules.assert_called_once_with()
+        adapter.parse_rules.assert_called_once_with(raw_rules)
+        mapper.to_domain.assert_called_once_with(parsed_rules)

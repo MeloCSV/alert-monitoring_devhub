@@ -2,17 +2,35 @@ import logging
 from typing import List
 from alert_monitoring.api.driven.prometheus_repository.models.prometheus_model import PrometheusRule
 
+from alert_monitoring.api.application.ports.driven.prometheus_alerts_provider_port import (
+    PrometheusAlertsProviderPort,
+    PrometheusSyncResult,
+)
 from alert_monitoring.api.driven.prometheus_repository.clients.kubernetes_prometheus_client import ( KubernetesPrometheusClient)
 from alert_monitoring.api.driven.prometheus_repository.config.cluster_settings import load_clusters_from_env
+from alert_monitoring.api.driven.prometheus_repository.mappers.prometheus_mapper import PrometheusMapper
 from alert_monitoring.api.driven.prometheus_repository.models.cluster_config import ClusterConfig
 
 logger = logging.getLogger(__name__)
 
-class PrometheusAdapter:
-        
-    def __init__(self, client: KubernetesPrometheusClient | None = None) -> None:
+class PrometheusAdapter(PrometheusAlertsProviderPort):
+
+    def __init__(
+        self,
+        client: KubernetesPrometheusClient | None = None,
+        mapper: PrometheusMapper | None = None,
+    ) -> None:
         self.client = client or KubernetesPrometheusClient()
-    
+        self.mapper = mapper or PrometheusMapper()
+
+    def fetch_alerts(self) -> PrometheusSyncResult:
+        rules = self.fetch_rules()
+        return PrometheusSyncResult(
+            total_rules=len(rules),
+            adhoc_alerts=self.mapper.to_adhoc_alerts(rules),
+            default_alerts=self.mapper.to_default_alerts(rules),
+        )
+
     def fetch_rules(self, clusters: List[ClusterConfig] | None = None) -> List[PrometheusRule]:
         clusters = clusters if clusters is not None else load_clusters_from_env()
         if not clusters:
