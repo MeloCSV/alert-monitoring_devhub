@@ -5,11 +5,11 @@ from fwkpy_lib_core.common.injector import inject
 from fwkpy_lib_utils.common.observability.logger.logger_setup import LoggerSetup
 
 from alert_monitoring.api.application.ports.driven.catalog_app_api_repository_port import CatalogAppApiRepositoryPort
+from alert_monitoring.api.application.ports.driven.catalog_app_api_source_port import CatalogAppApiSourcePort
 from alert_monitoring.api.application.ports.driven.catalog_app_repository_port import CatalogAppRepositoryPort
 from alert_monitoring.api.application.ports.driving.catalog_app_api_service_port import CatalogAppApiServicePort
 from alert_monitoring.api.application.services.catalog_lookup import build_catalog_lookup
 from alert_monitoring.api.domain.models.catalog_app_api import CatalogAppApi
-from alert_monitoring.api.driven.file_repository.adapters.catalog_app_api_file_adapter import CatalogAppApiFileAdapter
 
 
 class CatalogAppApiService(CatalogAppApiServicePort):
@@ -19,16 +19,17 @@ class CatalogAppApiService(CatalogAppApiServicePort):
         self,
         catalog_app_api_repository: CatalogAppApiRepositoryPort,
         catalog_app_repository: CatalogAppRepositoryPort,
+        catalog_app_api_source: CatalogAppApiSourcePort,
         logger: LoggerSetup,
     ):
         self.repository = catalog_app_api_repository
         self.catalog_app_repository = catalog_app_repository
-        self.file_adapter = CatalogAppApiFileAdapter()
+        self.catalog_app_api_source = catalog_app_api_source
         self.logger = logger
 
     def sync_catalog_app_api(self) -> int:
         self.logger.info("sync_catalog_app_api")
-        entries = self.file_adapter.fetch_entries()
+        entries = self.catalog_app_api_source.fetch_entries()
         catalog_lookup = self._build_catalog_lookup()
         items = self._process_entries(entries, catalog_lookup)
         self.repository.replace_all(items)

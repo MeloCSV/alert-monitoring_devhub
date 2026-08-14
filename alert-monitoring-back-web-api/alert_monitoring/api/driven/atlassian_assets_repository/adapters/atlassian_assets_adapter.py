@@ -1,6 +1,7 @@
 import logging
 from typing import List
 
+from alert_monitoring.api.application.ports.driven.catalog_sync_port import CatalogSyncPort
 from alert_monitoring.api.domain.models.catalog_app import CatalogApp
 from alert_monitoring.api.driven.atlassian_assets_repository.clients.atlassian_assets_http_client import (
     AtlassianAssetsHttpClient,
@@ -12,7 +13,7 @@ from alert_monitoring.api.driven.atlassian_assets_repository.config.atlassian_as
 logger = logging.getLogger(__name__)
 
 
-class AtlassianAssetsAdapter:
+class AtlassianAssetsAdapter(CatalogSyncPort):
 
     def __init__(self) -> None:
         self.client = AtlassianAssetsHttpClient()

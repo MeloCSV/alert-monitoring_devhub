@@ -39,19 +39,15 @@ from alert_monitoring.api.application.ports.driven.default_alert_api_repository_
 from alert_monitoring.api.application.ports.driven.default_alert_repository_port import DefaultAlertRepositoryPort
 from alert_monitoring.api.application.ports.driven.alert_api_repository_port import AlertApiRepositoryPort
 from alert_monitoring.api.application.ports.driven.blackout_repository_port import BlackoutRepositoryPort
+from alert_monitoring.api.application.ports.driven.blackout_provider_port import BlackoutProviderPort
+from alert_monitoring.api.application.ports.driven.elastic_alerts_provider_port import ElasticAlertsProviderPort
+from alert_monitoring.api.application.ports.driven.prometheus_alerts_provider_port import PrometheusAlertsProviderPort
 from alert_monitoring.api.application.exceptions.solution_not_found import SolutionNotFoundException
 from alert_monitoring.api.application.use_cases.get_all_alerts_use_case import GetAllAlertsUseCase
 from alert_monitoring.api.application.use_cases.get_api_solution_view_use_case import GetApiSolutionViewUseCase
 from alert_monitoring.api.application.use_cases.get_solution_view_use_case import GetSolutionViewUseCase
 from alert_monitoring.api.application.use_cases.save_alerts_use_case import SaveAlertsUseCase
 from alert_monitoring.api.application.services.catalog_lookup import build_catalog_lookup
-from alert_monitoring.api.driven.shared.alert_normalization import DEFAULT_ALERT_DISPLAY, build_exclusion_updates
-from alert_monitoring.api.driven.alertmanager_repository.adapters.alertmanager_adapter import AlertManagerAdapter
-from alert_monitoring.api.driven.elastic_repository.adapters.elastic_adapter import ElasticAdapter
-from alert_monitoring.api.driven.elastic_repository.mappers.elastic_mapper import ElasticMapper
-from alert_monitoring.api.driven.kibana_repository.adapters.kibana_adapter import KibanaAdapter
-from alert_monitoring.api.driven.prometheus_repository.adapters.prometheus_adapter import PrometheusAdapter
-from alert_monitoring.api.driven.prometheus_repository.mappers.prometheus_mapper import PrometheusMapper, is_default_rule
 from alert_monitoring.api.domain.models.alert import Alert
 from alert_monitoring.api.domain.models.alert_filter import AlertFilter
 from alert_monitoring.api.domain.models.blackout import Blackout
@@ -72,6 +68,9 @@ class AlertService(AlertServicePort):
         default_alert_repository: DefaultAlertRepositoryPort,
         default_alert_api_repository: DefaultAlertApiRepositoryPort,
         blackout_repository: BlackoutRepositoryPort,
+        prometheus_provider: PrometheusAlertsProviderPort,
+        elastic_provider: ElasticAlertsProviderPort,
+        blackout_provider: BlackoutProviderPort,
         logger: LoggerSetup,
     ):
         self.alert_repository = alert_repository
@@ -89,12 +88,9 @@ class AlertService(AlertServicePort):
         self.get_api_solution_view_use_case = GetApiSolutionViewUseCase(
             catalog_app_api_repository, default_alert_api_repository, alert_api_repository
         )
-        self.prometheus_adapter = PrometheusAdapter()
-        self.prometheus_mapper = PrometheusMapper()
-        self.elastic_adapter = ElasticAdapter()
-        self.elastic_mapper = ElasticMapper()
-        self.kibana_adapter = KibanaAdapter()
-        self.alertmanager_adapter = AlertManagerAdapter()
+        self.prometheus_provider = prometheus_provider
+        self.elastic_provider = elastic_provider
+        self.blackout_provider = blackout_provider
         self.logger = logger
         self._catalog_lookup_cache: _TTLCache = _TTLCache()
         self._default_alerts_cache: _TTLCache = _TTLCache()
@@ -117,62 +113,22 @@ class AlertService(AlertServicePort):
             normalized.append(alert)
         return normalized
 
-    def _upsert_default_alerts(self, default_rules) -> None:
-        if not default_rules:
-            return
-
-        exclusions = build_exclusion_updates(default_rules)
-
-        raw_descriptions: dict[str, str] = {}
-        first_severity: dict[str, str] = {}
-        first_channel: dict[str, str] = {}
-        for rule in default_rules:
-            raw_name = rule.alert.split()[0] if rule.alert else None
-            if not raw_name:
-                continue
-            if raw_name not in raw_descriptions:
-                raw_descriptions[raw_name] = rule.annotations.get("message", "")
-            if raw_name not in first_severity:
-                first_severity[raw_name] = rule.labels.get("severity", "")
-            if raw_name not in first_channel:
-                first_channel[raw_name] = self.prometheus_mapper._infer_channel(rule.labels) or ""
-
-        upsert_list: List[DefaultAlert] = []
-        for raw_name, (excl_ns, incl_ns, excl_jobs) in exclusions.items():
-            translation = DEFAULT_ALERT_DISPLAY.get(raw_name)
-            upsert_list.append(DefaultAlert(
-                raw_name=raw_name,
-                display_name=translation[0] if translation else raw_name,
-                raw_description=raw_descriptions.get(raw_name) or None,
-                display_description=translation[1] if translation else None,
-                severity=first_severity.get(raw_name) or None,
-                notification_channel=first_channel.get(raw_name) or None,
-                excluded_namespaces=excl_ns,
-                included_namespaces=incl_ns,
-                excluded_jobs=excl_jobs,
-            ))
-
-        self.default_alert_repository.upsert_batch(upsert_list)
-
     def sync_prometheus_alerts(self) -> int:
         self.logger.info('sync_prometheus_alerts')
-        rules = self.prometheus_adapter.fetch_rules()
-        default_raw_rules = [r for r in rules if is_default_rule(r)]
-        adhoc_alerts = [a for a in self.prometheus_mapper.to_domain(rules) if a.alert_type != "Por Defecto"]
+        result = self.prometheus_provider.fetch_alerts()
         catalog_lookup = self._catalog_lookup_cache.get_or_compute(self._build_catalog_lookup)
-        adhoc_alerts = self._normalize_solutions(adhoc_alerts, catalog_lookup)
+        adhoc_alerts = self._normalize_solutions(result.adhoc_alerts, catalog_lookup)
 
         self.alert_repository.delete_by_source_tool("Prometheus")
         self.save_use_case.execute(adhoc_alerts)
-        self._upsert_default_alerts(default_raw_rules)
+        if result.default_alerts:
+            self.default_alert_repository.upsert_batch(result.default_alerts)
         self._default_alerts_cache.invalidate()
-        return len(rules)
+        return result.total_rules
 
     def sync_elastic_alerts(self) -> int:
         self.logger.info('sync_elastic_alerts')
-        raw_rules = self.kibana_adapter.fetch_rules()
-        rules = self.elastic_adapter.parse_rules(raw_rules)
-        alerts = self.elastic_mapper.to_domain(rules)
+        alerts = self.elastic_provider.fetch_alerts()
         catalog_lookup = self._catalog_lookup_cache.get_or_compute(self._build_catalog_lookup)
         alerts = self._normalize_solutions(alerts, catalog_lookup)
         self.alert_repository.delete_by_source_tool("Elastic")
@@ -209,7 +165,7 @@ class AlertService(AlertServicePort):
 
     def sync_blackouts(self) -> int:
         self.logger.info('sync_blackouts')
-        blackouts = self.alertmanager_adapter.fetch_active_blackouts()
+        blackouts = self.blackout_provider.fetch_active_blackouts()
         if blackouts:
             catalog_app_names = [app.name for app in self.catalog_app_repository.get_all()]
             self.blackout_repository.upsert_batch(blackouts, catalog_app_names)

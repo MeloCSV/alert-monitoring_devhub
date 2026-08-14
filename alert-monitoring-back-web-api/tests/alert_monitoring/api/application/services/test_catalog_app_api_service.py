@@ -1,8 +1,9 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from alert_monitoring.api.application.ports.driven.catalog_app_api_repository_port import CatalogAppApiRepositoryPort
+from alert_monitoring.api.application.ports.driven.catalog_app_api_source_port import CatalogAppApiSourcePort
 from alert_monitoring.api.application.ports.driven.catalog_app_repository_port import CatalogAppRepositoryPort
 from alert_monitoring.api.application.services.catalog_app_api_service import CatalogAppApiService
 from alert_monitoring.api.domain.models.catalog_app import CatalogApp
@@ -11,12 +12,10 @@ from alert_monitoring.api.domain.models.catalog_app_api import CatalogAppApi
 
 @pytest.fixture
 def service(mocker):
-    mocker.patch(
-        'alert_monitoring.api.application.services.catalog_app_api_service.CatalogAppApiFileAdapter'
-    )
     return CatalogAppApiService(
         catalog_app_api_repository=mocker.MagicMock(spec=CatalogAppApiRepositoryPort),
         catalog_app_repository=mocker.MagicMock(spec=CatalogAppRepositoryPort),
+        catalog_app_api_source=mocker.MagicMock(spec=CatalogAppApiSourcePort),
         logger=mocker.MagicMock(),
     )
 

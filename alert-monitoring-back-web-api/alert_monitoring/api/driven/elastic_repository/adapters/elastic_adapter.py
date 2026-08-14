@@ -2,7 +2,11 @@ import logging
 import re
 from typing import Dict, List, Optional, Tuple
 
+from alert_monitoring.api.application.ports.driven.elastic_alerts_provider_port import ElasticAlertsProviderPort
+from alert_monitoring.api.domain.models.alert import Alert
+from alert_monitoring.api.driven.elastic_repository.mappers.elastic_mapper import ElasticMapper
 from alert_monitoring.api.driven.elastic_repository.models.elastic_model import ElasticRule
+from alert_monitoring.api.driven.kibana_repository.adapters.kibana_adapter import KibanaAdapter
 from alert_monitoring.api.driven.shared.alert_normalization import detect_environments
 
 logger = logging.getLogger(__name__)
@@ -13,7 +17,20 @@ _HTML_TAG = re.compile(r"<[^>]+>")
 _WHITESPACE = re.compile(r"\s+")
 
 
-class ElasticAdapter:
+class ElasticAdapter(ElasticAlertsProviderPort):
+
+    def __init__(
+        self,
+        kibana_adapter: Optional[KibanaAdapter] = None,
+        mapper: Optional[ElasticMapper] = None,
+    ) -> None:
+        self.kibana_adapter = kibana_adapter or KibanaAdapter()
+        self.mapper = mapper or ElasticMapper()
+
+    def fetch_alerts(self) -> List[Alert]:
+        raw_rules = self.kibana_adapter.fetch_rules()
+        rules = self.parse_rules(raw_rules)
+        return self.mapper.to_domain(rules)
 
     def parse_rules(self, items: List[dict]) -> List[ElasticRule]:
         rules: List[ElasticRule] = []

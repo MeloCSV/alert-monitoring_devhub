@@ -1,6 +1,7 @@
 import logging
 from typing import List, Optional
 
+from alert_monitoring.api.application.ports.driven.blackout_provider_port import BlackoutProviderPort
 from alert_monitoring.api.domain.models.blackout import Blackout, BlackoutMatcher
 from alert_monitoring.api.driven.alertmanager_repository.clients.alertmanager_http_client import AlertManagerHttpClient
 from alert_monitoring.api.driven.alertmanager_repository.config.alertmanager_settings import load_alertmanagers_from_env
@@ -9,7 +10,7 @@ from alert_monitoring.api.driven.alertmanager_repository.models.alertmanager_con
 logger = logging.getLogger(__name__)
 
 
-class AlertManagerAdapter:
+class AlertManagerAdapter(BlackoutProviderPort):
 
     def __init__(self, client: Optional[AlertManagerHttpClient] = None) -> None:
         self.client = client or AlertManagerHttpClient()

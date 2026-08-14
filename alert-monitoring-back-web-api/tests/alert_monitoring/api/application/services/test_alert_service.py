@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from alert_monitoring.api.application.services.alert_service import AlertService
 from alert_monitoring.api.application.ports.driven.alert_repository_port import AlertRepositoryPort
@@ -9,6 +9,12 @@ from alert_monitoring.api.application.ports.driven.catalog_app_api_repository_po
 from alert_monitoring.api.application.ports.driven.default_alert_repository_port import DefaultAlertRepositoryPort
 from alert_monitoring.api.application.ports.driven.default_alert_api_repository_port import DefaultAlertApiRepositoryPort
 from alert_monitoring.api.application.ports.driven.blackout_repository_port import BlackoutRepositoryPort
+from alert_monitoring.api.application.ports.driven.blackout_provider_port import BlackoutProviderPort
+from alert_monitoring.api.application.ports.driven.elastic_alerts_provider_port import ElasticAlertsProviderPort
+from alert_monitoring.api.application.ports.driven.prometheus_alerts_provider_port import (
+    PrometheusAlertsProviderPort,
+    PrometheusSyncResult,
+)
 from alert_monitoring.api.domain.models.alert import Alert
 from alert_monitoring.api.domain.models.alert_filter import AlertFilter
 from alert_monitoring.api.domain.models.api_solution_view import ApiSolutionView
@@ -16,7 +22,6 @@ from alert_monitoring.api.domain.models.blackout import Blackout, BlackoutMatche
 from alert_monitoring.api.domain.models.catalog_app import CatalogApp
 from alert_monitoring.api.domain.models.default_alert import DefaultAlert
 from alert_monitoring.api.domain.models.solution_view import SolutionView
-from alert_monitoring.api.driven.prometheus_repository.models.prometheus_model import PrometheusRule
 
 
 def _make_blackout(matchers: list[BlackoutMatcher]) -> Blackout:
@@ -36,11 +41,6 @@ def _make_alert(**kwargs) -> Alert:
 
 @pytest.fixture
 def service(mocker):
-    mocker.patch('alert_monitoring.api.application.services.alert_service.PrometheusAdapter')
-    mocker.patch('alert_monitoring.api.application.services.alert_service.KibanaAdapter')
-    mocker.patch('alert_monitoring.api.application.services.alert_service.ElasticAdapter')
-    mocker.patch('alert_monitoring.api.application.services.alert_service.AlertManagerAdapter')
-
     return AlertService(
         alert_repository=mocker.MagicMock(spec=AlertRepositoryPort),
         alert_api_repository=mocker.MagicMock(spec=AlertApiRepositoryPort),
@@ -49,6 +49,9 @@ def service(mocker):
         default_alert_repository=mocker.MagicMock(spec=DefaultAlertRepositoryPort),
         default_alert_api_repository=mocker.MagicMock(spec=DefaultAlertApiRepositoryPort),
         blackout_repository=mocker.MagicMock(spec=BlackoutRepositoryPort),
+        prometheus_provider=mocker.MagicMock(spec=PrometheusAlertsProviderPort),
+        elastic_provider=mocker.MagicMock(spec=ElasticAlertsProviderPort),
+        blackout_provider=mocker.MagicMock(spec=BlackoutProviderPort),
         logger=mocker.MagicMock(),
     )
 
@@ -208,7 +211,7 @@ class TestAlertServiceDelegatingMethods:
         Then should persist them via upsert_batch and return the count
         """
         blackouts = [Blackout(id='1', matchers=[]), Blackout(id='2', matchers=[])]
-        service.alertmanager_adapter.fetch_active_blackouts.return_value = blackouts
+        service.blackout_provider.fetch_active_blackouts.return_value = blackouts
         service.catalog_app_repository.get_all.return_value = [
             CatalogApp(object_id='1', name='reservas'),
         ]
@@ -224,7 +227,7 @@ class TestAlertServiceDelegatingMethods:
         When sync_blackouts is called
         Then upsert_batch should NOT be called
         """
-        service.alertmanager_adapter.fetch_active_blackouts.return_value = []
+        service.blackout_provider.fetch_active_blackouts.return_value = []
 
         count = service.sync_blackouts()
 
@@ -290,53 +293,46 @@ class TestAlertServiceDelegatingMethods:
         assert result == []
 
     def test_sync_prometheus_alerts_deletes_and_saves(self, service):
-        rules = [
-            PrometheusRule(alert='MyAlert', expr='', labels={'severity': 'warning'}, annotations={}, group_name='my-app.rules'),
-        ]
-        service.prometheus_adapter.fetch_rules.return_value = rules
-        service.catalog_app_repository.get_all.return_value = []
-        service.default_alert_repository.upsert_batch = MagicMock()
+        adhoc_alert = _make_alert(solution='my-app')
+        service.prometheus_provider.fetch_alerts.return_value = PrometheusSyncResult(
+            total_rules=1, adhoc_alerts=[adhoc_alert], default_alerts=[],
+        )
+        service.catalog_app_repository.get_all.return_value = [CatalogApp(object_id='1', name='my-app')]
 
         count = service.sync_prometheus_alerts()
 
         assert count == 1
         service.alert_repository.delete_by_source_tool.assert_called_once_with('Prometheus')
+        service.default_alert_repository.upsert_batch.assert_not_called()
 
     def test_sync_prometheus_alerts_does_not_save_alert_with_unrecognized_solution(self, service):
         """Si la solución inferida de la regla no está en el catálogo, la alerta no se guarda."""
-        rules = [
-            PrometheusRule(alert='MyAlert', expr='', labels={'severity': 'warning'}, annotations={}, group_name='my-app.rules'),
-        ]
-        service.prometheus_adapter.fetch_rules.return_value = rules
+        adhoc_alert = _make_alert(solution='my-app')
+        service.prometheus_provider.fetch_alerts.return_value = PrometheusSyncResult(
+            total_rules=1, adhoc_alerts=[adhoc_alert], default_alerts=[],
+        )
         service.catalog_app_repository.get_all.return_value = []  # catálogo vacío: "my-app" no se reconoce
-        service.default_alert_repository.upsert_batch = MagicMock()
 
         service.sync_prometheus_alerts()
 
         service.alert_repository.save_all.assert_called_once_with([])
 
-    def test_sync_elastic_alerts_deletes_and_saves(self, service, mocker):
-        service.kibana_adapter.fetch_rules.return_value = []
-        service.elastic_adapter.parse_rules.return_value = []
-        mocker.patch.object(service.elastic_mapper, 'to_domain', return_value=[])
+    def test_sync_prometheus_alerts_upserts_default_alerts(self, service):
+        default_alert = DefaultAlert(raw_name='Default_Status', display_name='Estado')
+        service.prometheus_provider.fetch_alerts.return_value = PrometheusSyncResult(
+            total_rules=1, adhoc_alerts=[], default_alerts=[default_alert],
+        )
+        service.catalog_app_repository.get_all.return_value = []
+
+        service.sync_prometheus_alerts()
+
+        service.default_alert_repository.upsert_batch.assert_called_once_with([default_alert])
+
+    def test_sync_elastic_alerts_deletes_and_saves(self, service):
+        service.elastic_provider.fetch_alerts.return_value = []
         service.catalog_app_repository.get_all.return_value = []
 
         count = service.sync_elastic_alerts()
 
         assert count == 0
         service.alert_repository.delete_by_source_tool.assert_called_once_with('Elastic')
-
-    def test_upsert_default_alerts_is_noop_for_empty_list(self, service):
-        service._upsert_default_alerts([])
-        service.default_alert_repository.upsert_batch.assert_not_called()
-
-    def test_upsert_default_alerts_calls_repository(self, service):
-        rule = PrometheusRule(
-            alert='Default_Status some label',
-            expr='namespace!~"excl-ns"',
-            labels={'severity': 'warning'},
-            annotations={'message': 'Service down'},
-            group_name='default.rules',
-        )
-        service._upsert_default_alerts([rule])
-        service.default_alert_repository.upsert_batch.assert_called_once()
